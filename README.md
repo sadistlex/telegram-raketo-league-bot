@@ -1,93 +1,245 @@
 # Telegram Raketo League Bot
 
+A Telegram bot for managing tennis league tournaments with automated player pairing, scheduling, and match coordination.
 
+## Features
 
-## Getting started
+- **Tournament Management**: Create and manage multiple tournaments with divisions
+- **Automated Scheduling**: 2-week tour system with automatic player pairing
+- **Availability Calendar**: Interactive web-based calendar for players to set their availability (green/yellow/red)
+- **Match Coordination**: View schedules, track matches, and manage postponements
+- **Admin Controls**: Full tournament and player management capabilities
+- **Notifications**: Automated reminders and updates for players
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+## Technology Stack
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+- **Backend**: Java 21, Spring Boot 3.3.5
+- **Database**: MySQL 8.0 (H2 for testing)
+- **Telegram Integration**: TelegramBots Library (7.10.0)
+- **Build Tool**: Maven
+- **Deployment**: Docker & Docker Compose
 
-## Add your files
-
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+## Project Structure
 
 ```
-cd existing_repo
-git remote add origin https://gitlab.com/sadistlex/telegram-raketo-league-bot.git
-git branch -M main
-git push -uf origin main
+telegram-raketo-league-bot/
+├── src/
+│   ├── main/
+│   │   ├── java/com/raketo/league/
+│   │   │   ├── model/              # Domain entities
+│   │   │   │   ├── Player.java
+│   │   │   │   ├── Tournament.java
+│   │   │   │   ├── Division.java
+│   │   │   │   ├── Tour.java
+│   │   │   │   ├── Match.java
+│   │   │   │   ├── AvailabilitySlot.java
+│   │   │   │   └── AdminUser.java
+│   │   │   ├── repository/         # Data access layer
+│   │   │   ├── service/           # Business logic
+│   │   │   ├── controller/        # REST API & Web controllers
+│   │   │   ├── telegram/          # Telegram bot integration
+│   │   │   │   ├── TelegramBot.java
+│   │   │   │   └── handler/
+│   │   │   │       ├── AdminCommandHandler.java
+│   │   │   │       └── PlayerCommandHandler.java
+│   │   │   └── TelegramLeagueBotApplication.java
+│   │   └── resources/
+│   │       ├── application.yml
+│   │       └── templates/
+│   │           └── calendar.html   # Web calendar UI
+│   └── test/
+│       └── resources/
+│           └── application-test.yml
+├── pom.xml
+├── Dockerfile
+├── docker-compose.yml
+└── README.md
 ```
 
-## Integrate with your tools
+## Getting Started
 
-- [ ] [Set up project integrations](https://gitlab.com/sadistlex/telegram-raketo-league-bot/-/settings/integrations)
+### Prerequisites
 
-## Collaborate with your team
+- Java 21 or higher
+- Maven 3.6+
+- MySQL 8.0 (or Docker)
+- Telegram Bot Token (from [@BotFather](https://t.me/botfather))
 
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+### Local Development Setup
 
-## Test and Deploy
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd telegram-raketo-league-bot
+   ```
 
-Use the built-in continuous integration in GitLab.
+2. **Configure environment variables**
+   ```bash
+   copy .env.example .env
+   ```
+   Edit `.env` and add your Telegram bot token:
+   ```
+   TELEGRAM_BOT_TOKEN=your_actual_bot_token
+   TELEGRAM_BOT_USERNAME=your_bot_username
+   ```
 
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
+3. **Start MySQL (using Docker)**
+   ```bash
+   docker-compose up mysql -d
+   ```
 
-***
+4. **Build and run the application**
+   ```bash
+   mvn clean install
+   mvn spring-boot:run
+   ```
 
-# Editing this README
+### Docker Deployment
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+1. **Configure environment variables**
+   ```bash
+   copy .env.example .env
+   ```
+   Edit `.env` with your settings.
 
-## Suggestions for a good README
+2. **Start all services**
+   ```bash
+   docker-compose up -d
+   ```
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+3. **View logs**
+   ```bash
+   docker-compose logs -f bot
+   ```
 
-## Name
-Choose a self-explaining name for your project.
+4. **Stop services**
+   ```bash
+   docker-compose down
+   ```
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+## Configuration
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+### Database
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+The application uses MySQL by default. Configuration is in `application.yml`:
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+```yaml
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/raketo_league
+    username: root
+    password: password
+```
+
+For testing, H2 in-memory database is used automatically.
+
+### Telegram Bot
+
+Set these environment variables:
+
+- `TELEGRAM_BOT_TOKEN`: Your bot token from BotFather
+- `TELEGRAM_BOT_USERNAME`: Your bot username
+- `WEBAPP_URL`: URL for the web calendar (default: http://localhost:8080/webapp)
 
 ## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+### Admin Commands
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+- `/start` - Initialize the bot
+- `/admin` - Show admin commands
+- `/createtournament` - Create a new tournament
+- `/addplayer @username` - Add a player to a division
+- `/viewschedule` - View tournament schedule
+- `/listtournaments` - List all tournaments
+- `/listplayers` - List all players
+
+### Player Commands
+
+- `/start` - Register or greet the player
+- `/schedule` - View match schedule
+- `/mymatches` - View your matches
+- `/setavailability` - Open calendar to set availability
+- `/help` - Show available commands
+
+## API Endpoints
+
+### Availability API
+
+- `GET /api/availability/player/{playerId}` - Get player availability
+- `GET /api/availability/match/{matchId}` - Get match availability
+- `POST /api/availability` - Save availability slot
+- `DELETE /api/availability/{slotId}` - Delete availability slot
+
+### Web App
+
+- `GET /webapp/calendar` - Interactive availability calendar
+
+## Development Roadmap
+
+### Phase 1: Core Structure ✅
+- [x] Project setup
+- [x] Database models
+- [x] Repository layer
+- [x] Service layer
+- [x] Basic bot structure
+
+### Phase 2: Admin Features (Next)
+- [ ] Tournament creation and management
+- [ ] Player registration system
+- [ ] Division management
+- [ ] Tour generation and scheduling
+- [ ] Match pairing algorithm
+
+### Phase 3: Player Features
+- [ ] View match schedule
+- [ ] Set availability via calendar
+- [ ] Match result reporting
+- [ ] Postponement requests
+- [ ] View standings
+
+### Phase 4: Advanced Features
+- [ ] Automatic time slot matching
+- [ ] Notification system
+- [ ] Statistics and leaderboards
+- [ ] Match reminders
+- [ ] Admin dashboard
+
+## Testing
+
+Run tests with:
+
+```bash
+mvn test
+```
+
+Tests use H2 in-memory database and mock Telegram API.
+
+## Deployment Options
+
+### Option 1: Docker Compose (Recommended)
+- Easy setup with included docker-compose.yml
+- MySQL and app in isolated containers
+- Persistent data storage
+
+### Option 2: Standalone JAR
+- Build: `mvn clean package`
+- Run: `java -jar target/telegram-league-bot-1.0.0-SNAPSHOT.jar`
+- Requires external MySQL instance
+
+### Option 3: Cloud Platforms
+- Deploy to any platform supporting Java applications
+- Examples: Heroku, AWS, DigitalOcean, Railway
+- Configure environment variables accordingly
 
 ## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
-
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
-
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+This is a personal project, but suggestions and feedback are welcome!
 
 ## License
-For open source projects, say how it is licensed.
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+MIT License
+
+## Support
+
+For issues or questions, please open a GitHub issue.
+

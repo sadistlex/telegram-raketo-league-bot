@@ -1,0 +1,33 @@
+spring:
+  application:
+    name: telegram-raketo-league-bot
+
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:raketo_league}?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
+    username: ${DB_USER:root}
+    password: ${DB_PASSWORD:password}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: ${SHOW_SQL:false}
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+        format_sql: true
+
+telegram:
+  bot:
+    token: ${TELEGRAM_BOT_TOKEN}
+    username: ${TELEGRAM_BOT_USERNAME}
+    webapp-url: ${WEBAPP_URL:http://localhost:8080/webapp}
+
+server:
+  port: ${SERVER_PORT:8080}
+
+logging:
+  level:
+    com.raketo: ${LOG_LEVEL:INFO}
+    org.telegram: ${LOG_LEVEL:INFO}
+
