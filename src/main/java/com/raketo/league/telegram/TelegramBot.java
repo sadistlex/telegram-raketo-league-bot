@@ -1,10 +1,10 @@
 package com.raketo.league.telegram;
 
 import com.raketo.league.service.AdminService;
-import com.raketo.league.service.PlayerService;
 import com.raketo.league.telegram.handler.AdminCommandHandler;
 import com.raketo.league.telegram.handler.PlayerCommandHandler;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
@@ -13,12 +13,12 @@ import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 @Component
-@Slf4j
 public class TelegramBot extends TelegramLongPollingBot {
+
+    private static final Logger logger = LoggerFactory.getLogger(TelegramBot.class);
 
     private final String botUsername;
     private final AdminService adminService;
-    private final PlayerService playerService;
     private final AdminCommandHandler adminCommandHandler;
     private final PlayerCommandHandler playerCommandHandler;
 
@@ -26,13 +26,11 @@ public class TelegramBot extends TelegramLongPollingBot {
             @Value("${telegram.bot.token}") String botToken,
             @Value("${telegram.bot.username}") String botUsername,
             AdminService adminService,
-            PlayerService playerService,
             AdminCommandHandler adminCommandHandler,
             PlayerCommandHandler playerCommandHandler) {
         super(botToken);
         this.botUsername = botUsername;
         this.adminService = adminService;
-        this.playerService = playerService;
         this.adminCommandHandler = adminCommandHandler;
         this.playerCommandHandler = playerCommandHandler;
     }
@@ -46,14 +44,12 @@ public class TelegramBot extends TelegramLongPollingBot {
                 handleCallbackQuery(update);
             }
         } catch (Exception e) {
-            log.error("Error processing update", e);
+            logger.error("Error processing update", e);
         }
     }
 
     private void handleTextMessage(Update update) {
-        Long chatId = update.getMessage().getChatId();
         Long userId = update.getMessage().getFrom().getId();
-        String text = update.getMessage().getText();
 
         if (adminService.isAdmin(userId)) {
             adminCommandHandler.handleCommand(update, this);
@@ -80,7 +76,7 @@ public class TelegramBot extends TelegramLongPollingBot {
         try {
             execute(message);
         } catch (TelegramApiException e) {
-            log.error("Error sending message to chat {}", chatId, e);
+            logger.error("Error sending message to chat {}", chatId, e);
         }
     }
 

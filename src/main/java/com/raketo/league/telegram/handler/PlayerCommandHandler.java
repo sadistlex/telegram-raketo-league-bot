@@ -4,14 +4,16 @@ import com.raketo.league.model.Player;
 import com.raketo.league.service.PlayerService;
 import com.raketo.league.telegram.TelegramBot;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.objects.Update;
 
 @Component
 @RequiredArgsConstructor
-@Slf4j
 public class PlayerCommandHandler {
+
+    private static final Logger logger = LoggerFactory.getLogger(PlayerCommandHandler.class);
 
     private final PlayerService playerService;
 
@@ -41,7 +43,7 @@ public class PlayerCommandHandler {
         Long chatId = update.getCallbackQuery().getMessage().getChatId();
         Long userId = update.getCallbackQuery().getFrom().getId();
 
-        log.info("Player callback received: {}", callbackData);
+        logger.info("Player callback received: {}", callbackData);
     }
 
     private void handleStartCommand(Long chatId, Long userId, String username, TelegramBot bot) {

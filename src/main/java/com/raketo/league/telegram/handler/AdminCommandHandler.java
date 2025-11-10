@@ -2,14 +2,16 @@ package com.raketo.league.telegram.handler;
 
 import com.raketo.league.telegram.TelegramBot;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.meta.api.objects.Update;
 
 @Component
 @RequiredArgsConstructor
-@Slf4j
 public class AdminCommandHandler {
+
+    private static final Logger logger = LoggerFactory.getLogger(AdminCommandHandler.class);
 
     public void handleCommand(Update update, TelegramBot bot) {
         String text = update.getMessage().getText();
@@ -32,9 +34,7 @@ public class AdminCommandHandler {
 
     public void handleCallback(Update update, TelegramBot bot) {
         String callbackData = update.getCallbackQuery().getData();
-        Long chatId = update.getCallbackQuery().getMessage().getChatId();
-
-        log.info("Admin callback received: {}", callbackData);
+        logger.info("Admin callback received: {}", callbackData);
     }
 
     private void handleStartCommand(Long chatId, TelegramBot bot) {

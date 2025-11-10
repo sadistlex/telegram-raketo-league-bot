@@ -3,7 +3,8 @@ package com.raketo.league.service;
 import com.raketo.league.model.AvailabilitySlot;
 import com.raketo.league.repository.AvailabilitySlotRepository;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -12,8 +13,9 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-@Slf4j
 public class AvailabilityService {
+
+    private static final Logger logger = LoggerFactory.getLogger(AvailabilityService.class);
 
     private final AvailabilitySlotRepository availabilitySlotRepository;
 
