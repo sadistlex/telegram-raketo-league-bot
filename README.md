@@ -4,20 +4,100 @@ A Telegram bot for managing tennis league tournaments with automated player pair
 
 ## Features
 
-- **Tournament Management**: Create and manage multiple tournaments with divisions
-- **Automated Scheduling**: 2-week tour system with automatic player pairing
-- **Availability Calendar**: Interactive web-based calendar for players to set their availability (green/yellow/red)
-- **Match Coordination**: View schedules, track matches, and manage postponements
-- **Admin Controls**: Full tournament and player management capabilities
-- **Notifications**: Automated reminders and updates for players
+- 🏆 **Tournament Management**: Create and manage multiple tournaments with divisions
+- 📅 **Automated Scheduling**: 2-week tour system with round-robin player pairing
+- 🎨 **Availability Calendar**: Interactive web-based calendar (green/yellow/red availability)
+- 🎯 **Smart Matching**: Automatic intersection of player availability for optimal match times
+- 🔔 **Match Coordination**: View schedules, track matches, manage postponements
+- ⚙️ **Admin Controls**: Full tournament and player management via interactive buttons
+- 💬 **User-Friendly**: Button-based interface, no need to memorize commands
+
+## Quick Start
+
+### For Users
+1. Open Telegram and find your league bot
+2. Send `/start` to see the interactive menu
+3. Click "📅 My Schedule" to view your matches
+4. Click "Set Availability" to mark your preferred times
+
+### For Admins
+1. Send `/start` and click "⚙️ Admin Panel"
+2. Use buttons to manage tournaments, players, and divisions
+3. Generate tours automatically with `/gentours` command
 
 ## Technology Stack
 
 - **Backend**: Java 21, Spring Boot 3.3.5
-- **Database**: MySQL 8.0 (H2 for testing)
-- **Telegram Integration**: TelegramBots Library (7.10.0)
+- **Database**: MySQL 8.0
+- **Telegram Integration**: TelegramBots Library 6.9.7.1
 - **Build Tool**: Maven
 - **Deployment**: Docker & Docker Compose
+
+## 🚀 Deployment
+
+Ready to deploy? We have detailed guides for multiple platforms:
+
+### Quick Deploy (Recommended)
+👉 **[Railway.app](DEPLOY_RAILWAY.md)** - Easiest, $5-10/month, 15 min setup
+
+### Budget Deploy
+👉 **[VPS (Hetzner/DigitalOcean)](DEPLOY_VPS.md)** - Cheapest, $5/month, full control
+
+### Enterprise Deploy
+👉 **[DigitalOcean App Platform](DEPLOY_DIGITALOCEAN.md)** - Managed, $19/month
+
+📋 **[Deployment Checklist](DEPLOYMENT_CHECKLIST.md)** - Complete this before deploying!
+
+📖 **[Quick Start Guide](DEPLOY.md)** - Overview of all deployment options
+
+## Local Development
+
+### Prerequisites
+- Java 21
+- Maven 3.8+
+- MySQL 8.0 (or use Docker)
+- Your Telegram Bot Token (from @BotFather)
+
+### Setup
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/YOUR_USERNAME/telegram-raketo-league-bot.git
+   cd telegram-raketo-league-bot
+   ```
+
+2. **Configure environment:**
+   ```bash
+   cp .env.example .env
+   # Edit .env with your values
+   ```
+
+3. **Start with Docker Compose:**
+   ```bash
+   docker-compose up -d
+   ```
+
+4. **Or run manually:**
+   ```bash
+   # Start MySQL
+   # Update src/main/resources/application-dev.yml with your config
+   mvn spring-boot:run
+   ```
+
+### Configuration
+
+Edit `src/main/resources/application-dev.yml`:
+
+```yaml
+telegram:
+  bot:
+    token: YOUR_BOT_TOKEN
+    username: YOUR_BOT_USERNAME
+
+app:
+  webapp:
+    enabled: false  # Set to false for local HTTP testing
+```
 
 ## Project Structure
 

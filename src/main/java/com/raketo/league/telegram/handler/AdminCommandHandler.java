@@ -8,10 +8,14 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 
 @Component
@@ -55,11 +59,94 @@ public class AdminCommandHandler {
 
     public void handleCallback(Update update, TelegramBot bot) {
         String callbackData = update.getCallbackQuery().getData();
+        Long chatId = update.getCallbackQuery().getMessage().getChatId();
+
         logger.info("Admin callback received: {}", callbackData);
+
+        if ("ADMIN_MENU".equals(callbackData)) {
+            showAdminMenu(chatId, bot);
+        } else if ("ADMIN_HELP".equals(callbackData)) {
+            handleAdminCommand(chatId, bot);
+        } else if (callbackData.startsWith("ADMIN_CMD_")) {
+            handleAdminCommandCallback(chatId, callbackData, bot);
+        }
     }
 
     private void handleStartCommand(Long chatId, TelegramBot bot) {
-        bot.sendMessage(chatId, "Welcome Admin! Use /admin to see available commands.");
+        showAdminMenu(chatId, bot);
+    }
+
+    private void showAdminMenu(Long chatId, TelegramBot bot) {
+        boolean isAlsoPlayer = playerService.findByTelegramId(chatId).isPresent();
+
+        StringBuilder message = new StringBuilder();
+        message.append("🛡️ Admin Panel\n\n");
+        message.append("Select an action from the menu below:");
+
+        SendMessage sendMessage = SendMessage.builder()
+                .chatId(chatId.toString())
+                .text(message.toString())
+                .replyMarkup(createAdminMenuKeyboard(isAlsoPlayer))
+                .build();
+
+        try {
+            bot.execute(sendMessage);
+        } catch (Exception e) {
+            logger.error("Failed to send admin menu", e);
+        }
+    }
+
+    private InlineKeyboardMarkup createAdminMenuKeyboard(boolean isAlsoPlayer) {
+        List<List<InlineKeyboardButton>> keyboard = new ArrayList<>();
+
+        InlineKeyboardButton listTournamentsBtn = InlineKeyboardButton.builder()
+                .text("🏆 List Tournaments")
+                .callbackData("ADMIN_CMD_LIST_TOURNAMENTS")
+                .build();
+
+        InlineKeyboardButton listPlayersBtn = InlineKeyboardButton.builder()
+                .text("👥 List Players")
+                .callbackData("ADMIN_CMD_LIST_PLAYERS")
+                .build();
+        keyboard.add(List.of(listTournamentsBtn, listPlayersBtn));
+
+        InlineKeyboardButton listDivisionsBtn = InlineKeyboardButton.builder()
+                .text("📊 List Divisions")
+                .callbackData("ADMIN_CMD_LIST_DIVISIONS")
+                .build();
+        keyboard.add(List.of(listDivisionsBtn));
+
+        InlineKeyboardButton helpBtn = InlineKeyboardButton.builder()
+                .text("📖 Command Help")
+                .callbackData("ADMIN_HELP")
+                .build();
+        keyboard.add(List.of(helpBtn));
+
+        if (isAlsoPlayer) {
+            InlineKeyboardButton playerBtn = InlineKeyboardButton.builder()
+                    .text("👤 My Schedule")
+                    .callbackData("PLAYER_SCHEDULE")
+                    .build();
+            keyboard.add(List.of(playerBtn));
+        }
+
+        return InlineKeyboardMarkup.builder().keyboard(keyboard).build();
+    }
+
+    private void handleAdminCommandCallback(Long chatId, String callbackData, TelegramBot bot) {
+        switch (callbackData) {
+            case "ADMIN_CMD_LIST_TOURNAMENTS":
+                handleListTournaments(chatId, bot);
+                break;
+            case "ADMIN_CMD_LIST_PLAYERS":
+                handleListPlayers(chatId, bot);
+                break;
+            case "ADMIN_CMD_LIST_DIVISIONS":
+                handleListDivisions(chatId, bot);
+                break;
+            default:
+                bot.sendMessage(chatId, "Unknown command");
+        }
     }
 
     private void handleAdminCommand(Long chatId, TelegramBot bot) {
@@ -67,15 +154,18 @@ public class AdminCommandHandler {
         boolean isAlsoPlayer = playerService.findByTelegramId(userId).isPresent();
 
         StringBuilder helpMessage = new StringBuilder();
-        helpMessage.append("Admin Commands:\n");
-        helpMessage.append(BotCommand.CREATE_TOURNAMENT.getCommand()).append(" <name> <desc> <startDate:yyyy-MM-dd> - Create tournament\n");
-        helpMessage.append(BotCommand.ADD_PLAYER.getCommand()).append(" <@username> <name> - Add a player\n");
+        helpMessage.append("Admin Commands:\n\n");
+        helpMessage.append("Note: Use <> for parameters with spaces\n\n");
+        helpMessage.append(BotCommand.CREATE_TOURNAMENT.getCommand()).append(" <name> <desc> <yyyy-MM-dd>\n");
+        helpMessage.append("  Example: /createtournament <Summer 2025> <Summer League> <2025-06-01>\n\n");
+        helpMessage.append(BotCommand.ADD_PLAYER.getCommand()).append(" <@username> <name>\n");
+        helpMessage.append("  Example: /addplayer <@john> <John Doe>\n\n");
         helpMessage.append(BotCommand.LIST_TOURNAMENTS.getCommand()).append(" - List all tournaments\n");
         helpMessage.append(BotCommand.LIST_PLAYERS.getCommand()).append(" - List all players\n");
         helpMessage.append(BotCommand.LIST_DIVISIONS.getCommand()).append(" - List all divisions\n");
-        helpMessage.append(BotCommand.ASSIGN_PLAYER.getCommand()).append(" <playerId> <divisionTournamentId> - Assign player to division\n");
-        helpMessage.append(BotCommand.VIEW_SCHEDULE.getCommand()).append(" <divisionTournamentId> - View schedule\n");
-        helpMessage.append(BotCommand.GENERATE_TOURS.getCommand()).append(" <divisionTournamentId> <start:yyyy-MM-dd> <intervalDays> - Generate tours\n");
+        helpMessage.append(BotCommand.ASSIGN_PLAYER.getCommand()).append(" <playerId> <divTournamentId>\n");
+        helpMessage.append(BotCommand.VIEW_SCHEDULE.getCommand()).append(" <divisionTournamentId>\n");
+        helpMessage.append(BotCommand.GENERATE_TOURS.getCommand()).append(" <divTournamentId> <yyyy-MM-dd> <days>\n");
 
         if (isAlsoPlayer) {
             helpMessage.append("\nPlayer Commands:\n");
@@ -88,14 +178,17 @@ public class AdminCommandHandler {
 
     private void handleCreateTournamentCommand(Long chatId, String text, TelegramBot bot) {
         try {
-            String[] parts = text.split(" ", 4);
-            if (parts.length < 4) {
+            String params = text.substring(BotCommand.CREATE_TOURNAMENT.getCommand().length()).trim();
+
+            List<String> parsed = parseParameters(params);
+            if (parsed.size() < 3) {
                 bot.sendMessage(chatId, "Usage: " + BotCommand.CREATE_TOURNAMENT.getCommand() + " <name> <description> <startDate:yyyy-MM-dd>");
                 return;
             }
-            String name = parts[1];
-            String description = parts[2];
-            LocalDateTime startDate = LocalDateTime.parse(parts[3] + "T00:00:00");
+
+            String name = parsed.get(0);
+            String description = parsed.get(1);
+            LocalDateTime startDate = LocalDateTime.parse(parsed.get(2) + "T00:00:00");
 
             Tournament tournament = tournamentService.createTournament(name, description, startDate);
             bot.sendMessage(chatId, "Tournament created successfully!\nID: " + tournament.getId() + "\nName: " + tournament.getName());
@@ -107,13 +200,16 @@ public class AdminCommandHandler {
 
     private void handleAddPlayerCommand(Long chatId, String text, TelegramBot bot) {
         try {
-            String[] parts = text.split(" ", 3);
-            if (parts.length < 3) {
+            String params = text.substring(BotCommand.ADD_PLAYER.getCommand().length()).trim();
+
+            List<String> parsed = parseParameters(params);
+            if (parsed.size() < 2) {
                 bot.sendMessage(chatId, "Usage: " + BotCommand.ADD_PLAYER.getCommand() + " <@username> <name>");
                 return;
             }
-            String username = parts[1].replace("@", "");
-            String name = parts[2];
+
+            String username = parsed.get(0).replace("@", "");
+            String name = parsed.get(1);
 
             if (playerService.isPlayerRegistered(username)) {
                 bot.sendMessage(chatId, "Player @" + username + " is already registered.");
@@ -301,5 +397,39 @@ public class AdminCommandHandler {
             logger.error("Error assigning player", e);
             bot.sendMessage(chatId, "Failed to assign player: " + e.getMessage());
         }
+    }
+
+    private List<String> parseParameters(String params) {
+        List<String> result = new ArrayList<>();
+        if (params == null || params.trim().isEmpty()) {
+            return result;
+        }
+
+        int i = 0;
+        while (i < params.length()) {
+            char c = params.charAt(i);
+
+            if (c == '<') {
+                int closingBracket = params.indexOf('>', i);
+                if (closingBracket == -1) {
+                    result.add(params.substring(i + 1).trim());
+                    break;
+                }
+                result.add(params.substring(i + 1, closingBracket).trim());
+                i = closingBracket + 1;
+            } else if (!Character.isWhitespace(c)) {
+                int nextSpace = params.indexOf(' ', i);
+                if (nextSpace == -1) {
+                    result.add(params.substring(i).trim());
+                    break;
+                }
+                result.add(params.substring(i, nextSpace).trim());
+                i = nextSpace + 1;
+            } else {
+                i++;
+            }
+        }
+
+        return result;
     }
 }

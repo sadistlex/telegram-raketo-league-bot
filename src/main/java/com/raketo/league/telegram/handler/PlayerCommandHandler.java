@@ -32,13 +32,17 @@ public class PlayerCommandHandler {
     private final AvailabilityService availabilityService;
     @Value("${app.base-url:http://localhost:8080}")
     private String baseUrl;
+    @Value("${app.webapp.enabled:false}")
+    private boolean webappEnabled;
 
     public void handleCommand(Update update, TelegramBot bot) {
         String text = update.getMessage().getText();
         Long chatId = update.getMessage().getChatId();
         Long userId = update.getMessage().getFrom().getId();
         String username = update.getMessage().getFrom().getUserName();
-        if (BotCommand.START.matches(text) || BotCommand.SCHEDULE.matches(text)) {
+        if (BotCommand.START.matches(text)) {
+            handleStartCommand(chatId, userId, bot);
+        } else if (BotCommand.SCHEDULE.matches(text)) {
             handleSchedule(chatId, userId, username, bot);
         } else if (BotCommand.HELP.matches(text)) {
             handleHelp(chatId, userId, bot);
@@ -54,7 +58,55 @@ public class PlayerCommandHandler {
         String username = update.getCallbackQuery().getFrom().getUserName();
         if ("PLAYER_SCHEDULE_REFRESH".equals(callbackData) || "PLAYER_SCHEDULE".equals(callbackData)) {
             handleSchedule(chatId, userId, username, bot);
+        } else if ("PLAYER_HELP".equals(callbackData)) {
+            handleHelp(chatId, userId, bot);
         }
+    }
+
+    private void handleStartCommand(Long chatId, Long userId, TelegramBot bot) {
+        boolean isAdmin = adminService.isAdmin(userId);
+
+        StringBuilder message = new StringBuilder();
+        message.append("Welcome to Raketo League Bot!\n\n");
+        message.append("Use the buttons below to navigate:");
+
+        SendMessage sendMessage = SendMessage.builder()
+                .chatId(chatId.toString())
+                .text(message.toString())
+                .replyMarkup(createPlayerMenuKeyboard(isAdmin))
+                .build();
+
+        try {
+            bot.execute(sendMessage);
+        } catch (Exception e) {
+            logger.error("Failed to send start menu", e);
+        }
+    }
+
+    private InlineKeyboardMarkup createPlayerMenuKeyboard(boolean isAdmin) {
+        List<List<InlineKeyboardButton>> keyboard = new ArrayList<>();
+
+        InlineKeyboardButton scheduleBtn = InlineKeyboardButton.builder()
+                .text("📅 My Schedule")
+                .callbackData("PLAYER_SCHEDULE")
+                .build();
+        keyboard.add(List.of(scheduleBtn));
+
+        InlineKeyboardButton helpBtn = InlineKeyboardButton.builder()
+                .text("❓ Help")
+                .callbackData("PLAYER_HELP")
+                .build();
+        keyboard.add(List.of(helpBtn));
+
+        if (isAdmin) {
+            InlineKeyboardButton adminBtn = InlineKeyboardButton.builder()
+                    .text("⚙️ Admin Panel")
+                    .callbackData("ADMIN_MENU")
+                    .build();
+            keyboard.add(List.of(adminBtn));
+        }
+
+        return InlineKeyboardMarkup.builder().keyboard(keyboard).build();
     }
 
     private void handleSchedule(Long chatId, Long userId, String username, TelegramBot bot) {
@@ -65,19 +117,24 @@ public class PlayerCommandHandler {
         }
         ScheduleService.PlayerSchedule ps = scheduleService.buildPlayerSchedule(player);
         String messageText = scheduleService.renderScheduleMessage(ps);
+
         SendMessage message = SendMessage.builder().chatId(chatId.toString()).text(messageText).replyMarkup(scheduleKeyboardWithTours(ps)).build();
         try { bot.execute(message); } catch (Exception e) { logger.error("Failed to send schedule", e); }
     }
 
     private InlineKeyboardMarkup scheduleKeyboardWithTours(ScheduleService.PlayerSchedule schedule) {
         List<List<InlineKeyboardButton>> keyboard = new ArrayList<>();
-        for (ScheduleService.TourInfo ti : schedule.tours()) {
-            InlineKeyboardButton availabilityBtn = InlineKeyboardButton.builder()
-                    .text("Set Availability (Tour " + ti.tourId() + ")")
-                    .webApp(new WebAppInfo(baseUrl + "/webapp/calendar?playerId=" + schedule.player().getTelegramId() + "&tourId=" + ti.tourId()))
-                    .build();
-            keyboard.add(List.of(availabilityBtn));
+
+        if (webappEnabled) {
+            for (ScheduleService.TourInfo ti : schedule.tours()) {
+                InlineKeyboardButton availabilityBtn = InlineKeyboardButton.builder()
+                        .text("Set Availability (Tour " + ti.tourId() + ")")
+                        .webApp(new WebAppInfo(baseUrl + "/webapp/calendar?playerId=" + schedule.player().getTelegramId() + "&tourId=" + ti.tourId()))
+                        .build();
+                keyboard.add(List.of(availabilityBtn));
+            }
         }
+
         InlineKeyboardButton refresh = InlineKeyboardButton.builder().text("Refresh").callbackData("PLAYER_SCHEDULE_REFRESH").build();
         keyboard.add(List.of(refresh));
         return InlineKeyboardMarkup.builder().keyboard(keyboard).build();

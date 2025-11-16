@@ -21,7 +21,7 @@ public class Player {
     @Builder.Default
     private Boolean isActive = true;
 
-    @Column(name = "telegram_id", nullable = false, unique = true)
+    @Column(name = "telegram_id", unique = true)
     private Long telegramId;
 
     @Column(name = "telegram_username", nullable = false, unique = true)

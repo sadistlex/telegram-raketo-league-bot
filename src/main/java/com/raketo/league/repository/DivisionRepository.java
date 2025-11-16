@@ -8,9 +8,6 @@ import java.util.List;
 
 @Repository
 public interface DivisionRepository extends JpaRepository<Division, Long> {
-
-    List<Division> findByTournamentId(Long tournamentId);
-
-    List<Division> findByTournamentIdAndIsActive(Long tournamentId, Boolean isActive);
+    List<Division> findByIsActiveTrue();
 }
 
