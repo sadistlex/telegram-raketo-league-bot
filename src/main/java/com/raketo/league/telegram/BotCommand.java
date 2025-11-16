@@ -13,7 +13,8 @@ public enum BotCommand {
     LIST_PLAYERS("/listplayers", CommandType.ADMIN),
     LIST_DIVISIONS("/listdivisions", CommandType.ADMIN),
     ASSIGN_PLAYER("/assignplayer", CommandType.ADMIN),
-    GENERATE_TOURS("/gentours", CommandType.ADMIN);
+    GENERATE_TOURS("/gentours", CommandType.ADMIN),
+    REGENERATE_TOURS("/regentours", CommandType.ADMIN);
 
     private final String command;
     private final CommandType type;

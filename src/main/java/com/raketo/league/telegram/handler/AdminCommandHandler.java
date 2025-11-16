@@ -52,6 +52,8 @@ public class AdminCommandHandler {
             handleAssignPlayer(chatId, text, bot);
         } else if (BotCommand.GENERATE_TOURS.matches(text)) {
             handleGenerateTours(chatId, text, bot);
+        } else if (BotCommand.REGENERATE_TOURS.matches(text)) {
+            handleRegenerateTours(chatId, text, bot);
         } else {
             bot.sendMessage(chatId, "Unknown admin command. Type /admin for help.");
         }
@@ -137,11 +139,17 @@ public class AdminCommandHandler {
                 .callbackData("ADMIN_CMD_GENERATE_TOURS")
                 .build();
 
+        InlineKeyboardButton regenerateToursBtn = InlineKeyboardButton.builder()
+                .text("🔄 Regenerate Tours")
+                .callbackData("ADMIN_CMD_REGENERATE_TOURS")
+                .build();
+        keyboard.add(List.of(generateToursBtn, regenerateToursBtn));
+
         InlineKeyboardButton viewScheduleBtn = InlineKeyboardButton.builder()
                 .text("📅 View Schedule")
                 .callbackData("ADMIN_CMD_VIEW_SCHEDULE")
                 .build();
-        keyboard.add(List.of(generateToursBtn, viewScheduleBtn));
+        keyboard.add(List.of(viewScheduleBtn));
 
         InlineKeyboardButton helpBtn = InlineKeyboardButton.builder()
                 .text("📖 Command Help")
@@ -183,6 +191,9 @@ public class AdminCommandHandler {
             case "ADMIN_CMD_GENERATE_TOURS":
                 bot.sendMessage(chatId, "Use command: " + BotCommand.GENERATE_TOURS.getCommand() + " <divisionTournamentId> <start:yyyy-MM-dd> <intervalDays>");
                 break;
+            case "ADMIN_CMD_REGENERATE_TOURS":
+                bot.sendMessage(chatId, "Use command: " + BotCommand.REGENERATE_TOURS.getCommand() + " <divisionTournamentId>");
+                break;
             case "ADMIN_CMD_VIEW_SCHEDULE":
                 bot.sendMessage(chatId, "Use command: " + BotCommand.VIEW_SCHEDULE.getCommand() + " <divisionTournamentId>");
                 break;
@@ -208,6 +219,7 @@ public class AdminCommandHandler {
         helpMessage.append(BotCommand.ASSIGN_PLAYER.getCommand()).append(" <playerId> <divTournamentId>\n");
         helpMessage.append(BotCommand.VIEW_SCHEDULE.getCommand()).append(" <divisionTournamentId>\n");
         helpMessage.append(BotCommand.GENERATE_TOURS.getCommand()).append(" <divTournamentId> <yyyy-MM-dd> <days>\n");
+        helpMessage.append(BotCommand.REGENERATE_TOURS.getCommand()).append(" <divTournamentId> - Regenerate tours (preserves availability)\n");
 
         if (isAlsoPlayer) {
             helpMessage.append("\nPlayer Commands:\n");
@@ -329,6 +341,22 @@ public class AdminCommandHandler {
         } catch (Exception e) {
             logger.error("Error generating tours", e);
             bot.sendMessage(chatId, "Failed to generate tours: " + e.getMessage());
+        }
+    }
+
+    private void handleRegenerateTours(Long chatId, String text, TelegramBot bot) {
+        try {
+            String[] parts = text.split(" ");
+            if (parts.length < 2) {
+                bot.sendMessage(chatId, "Usage: " + BotCommand.REGENERATE_TOURS.getCommand() + " <divisionTournamentId>");
+                return;
+            }
+            Long dtId = Long.parseLong(parts[1]);
+            int created = tourService.regenerateRoundRobinTours(dtId);
+            bot.sendMessage(chatId, "Regenerated " + created + " tours. Availability data preserved where possible. Schedule requests deleted.");
+        } catch (Exception e) {
+            logger.error("Error regenerating tours", e);
+            bot.sendMessage(chatId, "Failed to regenerate tours: " + e.getMessage());
         }
     }
 
