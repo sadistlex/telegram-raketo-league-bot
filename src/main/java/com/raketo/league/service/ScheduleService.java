@@ -1,12 +1,7 @@
 package com.raketo.league.service;
 
-import com.raketo.league.model.AvailabilitySlot;
-import com.raketo.league.model.Player;
-import com.raketo.league.model.Tour;
-import com.raketo.league.model.TourPlayer;
-import com.raketo.league.repository.AvailabilitySlotRepository;
-import com.raketo.league.repository.TourPlayerRepository;
-import com.raketo.league.repository.TourRepository;
+import com.raketo.league.model.*;
+import com.raketo.league.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,40 +17,88 @@ public class ScheduleService {
     private final TourRepository tourRepository;
     private final TourPlayerRepository tourPlayerRepository;
     private final AvailabilitySlotRepository availabilitySlotRepository;
+    private final PlayerDivisionAssignmentRepository playerDivisionAssignmentRepository;
+    private final TourTemplateRepository tourTemplateRepository;
     private static final ZoneId ZONE_ID = ZoneId.of("Asia/Tbilisi");
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd.MM").withZone(ZONE_ID);
 
     @Transactional(readOnly = true)
     public PlayerSchedule buildPlayerSchedule(Player player) {
-        List<TourPlayer> tourPlayers = tourPlayerRepository.findByPlayerId(player.getId());
-        Map<Long, List<TourPlayer>> byTour = tourPlayers.stream().collect(Collectors.groupingBy(tp -> tp.getTour().getId()));
-        List<TourInfo> tourInfos = new ArrayList<>();
-        for (Long tourId : byTour.keySet()) {
-            Tour tour = tourRepository.findById(tourId).orElse(null);
-            if (tour == null) continue;
-            List<TourPlayer> players = byTour.get(tourId);
-            Player opponent = players.stream().map(TourPlayer::getPlayer).filter(p -> !Objects.equals(p.getId(), player.getId())).findFirst().orElse(null);
-            tourInfos.add(new TourInfo(tour.getId(), tour.getTourTemplate().getStartDate(), tour.getTourTemplate().getEndDate(), tour.getStatus(), opponent));
+        List<PlayerDivisionAssignment> assignments = playerDivisionAssignmentRepository.findByPlayerId(player.getId());
+        if (assignments.isEmpty()) {
+            return new PlayerSchedule(player, List.of());
         }
-        tourInfos.sort(Comparator.comparing(TourInfo::startDate));
+
+        Set<Long> divisionTournamentIds = assignments.stream()
+                .map(a -> a.getDivisionTournament().getId())
+                .collect(Collectors.toSet());
+
+        List<TourTemplate> allTemplates = new ArrayList<>();
+        for (Long dtId : divisionTournamentIds) {
+            allTemplates.addAll(tourTemplateRepository.findByDivisionTournamentId(dtId));
+        }
+
+        allTemplates.sort(Comparator.comparing(TourTemplate::getStartDate));
+
+        List<TourPlayer> tourPlayers = tourPlayerRepository.findByPlayerId(player.getId());
+        Map<Long, Tour> playerToursByTemplateId = new HashMap<>();
+        Map<Long, Player> opponentsByTemplateId = new HashMap<>();
+
+        for (TourPlayer tp : tourPlayers) {
+            Tour tour = tp.getTour();
+            Long templateId = tour.getTourTemplate().getId();
+            playerToursByTemplateId.put(templateId, tour);
+
+            List<TourPlayer> allPlayersInTour = tourPlayerRepository.findByTourId(tour.getId());
+            Player opponent = allPlayersInTour.stream()
+                    .map(TourPlayer::getPlayer)
+                    .filter(p -> !Objects.equals(p.getId(), player.getId()))
+                    .findFirst()
+                    .orElse(null);
+            opponentsByTemplateId.put(templateId, opponent);
+        }
+
+        List<TourInfo> tourInfos = new ArrayList<>();
+        for (TourTemplate template : allTemplates) {
+            Tour tour = playerToursByTemplateId.get(template.getId());
+            Player opponent = opponentsByTemplateId.get(template.getId());
+
+            Long tourId = tour != null ? tour.getId() : null;
+            Tour.TourStatus status = tour != null ? tour.getStatus() : null;
+
+            tourInfos.add(new TourInfo(tourId, template.getStartDate(), template.getEndDate(), status, opponent));
+        }
+
         return new PlayerSchedule(player, tourInfos);
     }
 
     public String renderScheduleMessage(PlayerSchedule schedule) {
         StringBuilder sb = new StringBuilder();
         sb.append("Player: ").append(schedule.player().getName()).append(" (@").append(schedule.player().getTelegramUsername()).append(")\n\n");
-        if (schedule.tours().isEmpty()) sb.append("No tours assigned yet.");
-        for (TourInfo ti : schedule.tours()) {
-            List<AvailabilitySlot> availabilitySlots = availabilitySlotRepository.findByPlayerIdAndTourId(
-                    schedule.player().getId(), ti.tourId());
-            String availabilityStatus = availabilitySlots.isEmpty() ? "Not Set" : "Set";
+        if (schedule.tours().isEmpty()) {
+            sb.append("No tours assigned yet.");
+        } else {
+            int tourNumber = 1;
+            for (TourInfo ti : schedule.tours()) {
+                sb.append("Tour ").append(tourNumber).append(" (")
+                        .append(DATE_FMT.format(ti.startDate())).append("-")
+                        .append(DATE_FMT.format(ti.endDate())).append(") - ");
 
-            sb.append("Tour ").append(ti.tourId()).append(" (")
-                    .append(DATE_FMT.format(ti.startDate())).append("-")
-                    .append(DATE_FMT.format(ti.endDate())).append(") Status: ").append(ti.status())
-                    .append(", Availability: ").append(availabilityStatus).append("\n");
-            if (ti.opponent() != null) sb.append("Opponent: ").append(ti.opponent().getName()).append("\n");
-            sb.append("\n");
+                if (ti.opponent() != null) {
+                    List<AvailabilitySlot> availabilitySlots = availabilitySlotRepository.findByPlayerIdAndTourId(
+                            schedule.player().getId(), ti.tourId());
+                    String availabilityStatus = availabilitySlots.isEmpty() ? "Not Set" : "Set";
+
+                    sb.append(ti.opponent().getName())
+                            .append(", Status: ").append(ti.status())
+                            .append(", Availability: ").append(availabilityStatus);
+                } else {
+                    sb.append("Bye");
+                }
+
+                sb.append("\n");
+                tourNumber++;
+            }
         }
         return sb.toString();
     }

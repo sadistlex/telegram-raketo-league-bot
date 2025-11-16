@@ -304,16 +304,21 @@ public class AdminCommandHandler {
                 if (ps.tours().isEmpty()) {
                     message.append("  No tours assigned\n");
                 } else {
+                    int tourNumber = 1;
+                    DateTimeFormatter fmt = DateTimeFormatter.ofPattern("dd.MM");
                     for (ScheduleService.TourInfo ti : ps.tours()) {
-                        DateTimeFormatter fmt = DateTimeFormatter.ofPattern("dd.MM HH:mm");
-                        message.append("  Tour ").append(ti.tourId())
-                               .append(": ").append(ti.startDate().format(fmt))
-                               .append(" - ").append(ti.endDate().format(fmt))
-                               .append(" [").append(ti.status()).append("]");
+                        message.append("  Tour ").append(tourNumber)
+                               .append(" (").append(ti.startDate().format(fmt))
+                               .append("-").append(ti.endDate().format(fmt))
+                               .append(") - ");
                         if (ti.opponent() != null) {
-                            message.append(" vs ").append(ti.opponent().getName());
+                            message.append(ti.opponent().getName())
+                                   .append(" [").append(ti.status()).append("]");
+                        } else {
+                            message.append("Bye");
                         }
                         message.append("\n");
+                        tourNumber++;
                     }
                 }
                 message.append("\n");
