@@ -499,18 +499,21 @@
                 const res = await fetch(`/api/availability/tour/${tourId}/player/${playerId}`);
                 if (res.ok) {
                     const data = await res.json();
-                    if (data) {
+                    if (data && (data.availableSlots || data.unavailableSlots)) {
                         loadJsonMaps(data.availableSlots, data.unavailableSlots);
                         renderCalendar();
+                        return true;
                     }
                 }
             } catch (e) {
                 console.error('load error', e);
             }
+            return false;
         }
 
         function loadJsonMaps(availJson, unavailJson) {
             try {
+                slots = {};
                 const a = availJson ? JSON.parse(availJson) : {};
                 Object.entries(a).forEach(([day, hours]) => {
                     hours.forEach(h => {
@@ -580,8 +583,12 @@
         if (tourStartDate) currentWeekStart = new Date(tourStartDate);
 
         setMode('green');
-        setPresetTimes();
-        loadExisting().then(() => renderCalendar());
+        loadExisting().then((hasData) => {
+            if (!hasData) {
+                setPresetTimes();
+            }
+            renderCalendar();
+        });
     </script>
 </body>
 </html>
