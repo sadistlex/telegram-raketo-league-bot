@@ -21,7 +21,7 @@ public class TournamentService {
 
     @Transactional(readOnly = true)
     public List<Tournament> getActiveTournaments() {
-        return tournamentRepository.findByStatus(Tournament.TournamentStatus.ACTIVE);
+        return tournamentRepository.findByIsActiveTrue();
     }
 
     @Transactional(readOnly = true)
@@ -33,5 +33,20 @@ public class TournamentService {
     public Tournament saveTournament(Tournament tournament) {
         return tournamentRepository.save(tournament);
     }
-}
 
+    @Transactional(readOnly = true)
+    public List<Tournament> getAllTournaments() {
+        return tournamentRepository.findAll();
+    }
+
+    @Transactional
+    public Tournament createTournament(String name, String description, java.time.LocalDateTime startDate) {
+        Tournament tournament = Tournament.builder()
+                .name(name)
+                .description(description)
+                .startDate(startDate)
+                .isActive(true)
+                .build();
+        return tournamentRepository.save(tournament);
+    }
+}

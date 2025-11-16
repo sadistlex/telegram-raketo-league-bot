@@ -8,15 +8,13 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
 public class PlayerService {
-
     private static final Logger logger = LoggerFactory.getLogger(PlayerService.class);
-
     private final PlayerRepository playerRepository;
 
     @Transactional(readOnly = true)
@@ -25,30 +23,40 @@ public class PlayerService {
     }
 
     @Transactional(readOnly = true)
+    public Optional<Player> findById(Long id) {
+        return playerRepository.findById(id);
+    }
+
+    @Transactional(readOnly = true)
     public Optional<Player> findByTelegramUsername(String username) {
         return playerRepository.findByTelegramUsername(username);
     }
 
     @Transactional
-    public Player createPlayer(Long telegramId, String username, String firstName, String lastName) {
-        Player player = Player.builder()
-                .telegramId(telegramId)
-                .telegramUsername(username)
-                .firstName(firstName)
-                .lastName(lastName)
-                .isActive(true)
-                .postponementsUsed(0)
-                .createdAt(LocalDateTime.now())
-                .lastActiveAt(LocalDateTime.now())
-                .build();
-        return playerRepository.save(player);
+    public Player findOrLinkPlayer(Long telegramId, String telegramUsername) {
+        Optional<Player> byId = findByTelegramId(telegramId);
+        if (byId.isPresent()) return byId.get();
+        Optional<Player> byUsername = findByTelegramUsername(telegramUsername);
+        if (byUsername.isPresent()) {
+            Player player = byUsername.get();
+            if (player.getTelegramId() == null) {
+                player.setTelegramId(telegramId);
+                logger.info("Linked telegram ID {} to player {}", telegramId, telegramUsername);
+                return playerRepository.save(player);
+            }
+            return player;
+        }
+        return null;
     }
 
     @Transactional
-    public Player updateLastActive(Long playerId) {
-        Player player = playerRepository.findById(playerId)
-                .orElseThrow(() -> new IllegalArgumentException("Player not found: " + playerId));
-        player.setLastActiveAt(LocalDateTime.now());
+    public Player createPlayer(Long telegramId, String username, String name) {
+        Player player = Player.builder()
+                .telegramId(telegramId)
+                .telegramUsername(username)
+                .name(name)
+                .isActive(true)
+                .build();
         return playerRepository.save(player);
     }
 
@@ -56,5 +64,9 @@ public class PlayerService {
     public boolean isPlayerRegistered(String username) {
         return playerRepository.existsByTelegramUsername(username);
     }
-}
 
+    @Transactional(readOnly = true)
+    public List<Player> getAllPlayers() {
+        return playerRepository.findAll();
+    }
+}

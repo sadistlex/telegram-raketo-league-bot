@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Match Availability Calendar</title>
+    <title>Tour Availability</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         * {
@@ -85,29 +85,41 @@
             cursor: pointer;
         }
 
-        .calendar-grid {
-            display: grid;
-            grid-template-columns: 60px repeat(7, 1fr);
-            gap: 4px;
+        .week-selector button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
 
-        .day-header {
+        .calendar-grid {
+            overflow-x: auto;
+        }
+
+        .calendar-table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 600px;
+        }
+
+        .calendar-table th {
             text-align: center;
             font-weight: bold;
             padding: 8px 4px;
             font-size: 12px;
+            border-bottom: 2px solid #ddd;
         }
 
-        .time-label {
+        .calendar-table td.time-label {
             padding: 8px 4px;
-            font-size: 12px;
+            font-size: 11px;
             text-align: right;
+            color: #666;
+            width: 60px;
         }
 
         .time-slot {
-            min-height: 40px;
+            min-height: 30px;
+            height: 30px;
             border: 1px solid #ddd;
-            border-radius: 4px;
             cursor: pointer;
             background-color: #fff;
             transition: background-color 0.2s;
@@ -170,12 +182,17 @@
             font-weight: bold;
             cursor: pointer;
         }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+        }
     </style>
 </head>
 <body>
     <div class="header">
         <h1>Set Your Availability</h1>
-        <p>Click time slots to mark your availability</p>
+        <p>Select hours for this tour window</p>
     </div>
 
     <div class="legend">
@@ -202,79 +219,211 @@
     <div class="calendar-container">
         <div class="week-selector">
             <button id="prev-week">← Previous</button>
-            <span id="week-display">Week 1</span>
+            <span id="week-display">Loading...</span>
             <button id="next-week">Next →</button>
         </div>
 
-        <div class="calendar-grid" id="calendar-grid">
+        <div class="calendar-grid">
+            <table class="calendar-table" id="calendar-table">
+                <thead id="calendar-header"></thead>
+                <tbody id="calendar-body"></tbody>
+            </table>
         </div>
     </div>
 
     <button class="save-button" id="save-button">Save Availability</button>
 
-    <script>
+    <script th:inline="javascript">
         const tg = window.Telegram.WebApp;
         tg.expand();
 
+        const playerId = /*[[${playerId}]]*/ null;
+        const tourId = /*[[${tourId}]]*/ null;
+        const tourStartDate = /*[[${tourStartDate}]]*/ null;
+        const tourEndDate = /*[[${tourEndDate}]]*/ null;
+
         let currentMode = 'green';
-        let slots = {};
+        let slots = {}; // ISO -> mode
+        let currentWeekStart = new Date();
+        let weekDates = [];
+
+        const startHour = 8;
+        const endHour = 23;
 
         document.getElementById('btn-green').addEventListener('click', () => setMode('green'));
         document.getElementById('btn-yellow').addEventListener('click', () => setMode('yellow'));
         document.getElementById('btn-red').addEventListener('click', () => setMode('red'));
+        document.getElementById('prev-week').addEventListener('click', () => changeWeek(-1));
+        document.getElementById('next-week').addEventListener('click', () => changeWeek(1));
 
-        function setMode(mode) {
-            currentMode = mode;
-            document.querySelectorAll('.controls button').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            document.getElementById(`btn-${mode}`).classList.add('active');
+        function setMode(m){
+            currentMode = m;
+            document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
+            document.getElementById(`btn-${m}`).classList.add('active');
         }
 
-        function initCalendar() {
-            const grid = document.getElementById('calendar-grid');
-            const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-            const hours = Array.from({length: 24}, (_, i) => i);
+        function changeWeek(o){
+            currentWeekStart.setDate(currentWeekStart.getDate() + (o * 7));
+            renderCalendar();
+        }
 
-            grid.innerHTML = '<div></div>';
-            days.forEach(day => {
-                const header = document.createElement('div');
-                header.className = 'day-header';
-                header.textContent = day;
-                grid.appendChild(header);
-            });
+        function getMonday(d){
+            d = new Date(d);
+            const day = d.getDay();
+            const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+            return new Date(d.setDate(diff));
+        }
 
-            hours.forEach(hour => {
-                const timeLabel = document.createElement('div');
-                timeLabel.className = 'time-label';
-                timeLabel.textContent = `${hour}:00`;
-                grid.appendChild(timeLabel);
+        function formatDate(date){
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            return `${day}.${month}`;
+        }
 
-                days.forEach((day, dayIndex) => {
+        function renderCalendar(){
+            const monday = getMonday(currentWeekStart);
+            weekDates = [];
+
+            for (let i = 0; i < 7; i++) {
+                const date = new Date(monday);
+                date.setDate(date.getDate() + i);
+                weekDates.push(date);
+            }
+
+            const weekDisplay = `${formatDate(weekDates[0])} - ${formatDate(weekDates[6])}`;
+            document.getElementById('week-display').textContent = weekDisplay;
+
+            const header = document.getElementById('calendar-header');
+            const body = document.getElementById('calendar-body');
+
+            header.innerHTML = '<tr><th></th>' +
+                weekDates.map(d => `<th>${['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][d.getDay() === 0 ? 6 : d.getDay()-1]}<br/>${formatDate(d)}</th>`).join('') +
+                '</tr>';
+
+            body.innerHTML = '';
+
+            for (let hour = startHour; hour <= endHour; hour++) {
+                const row = document.createElement('tr');
+                const timeCell = document.createElement('td');
+                timeCell.className = 'time-label';
+                timeCell.textContent = `${String(hour).padStart(2, '0')}:00`;
+                row.appendChild(timeCell);
+
+                weekDates.forEach(date => {
+                    const cell = document.createElement('td');
                     const slot = document.createElement('div');
                     slot.className = 'time-slot';
-                    slot.dataset.day = dayIndex;
-                    slot.dataset.hour = hour;
+
+                    const slotDate = new Date(date);
+                    slotDate.setHours(hour, 0, 0, 0);
+                    const key = slotDate.toISOString();
+
+                    if (slots[key]) {
+                        slot.classList.add(slots[key]);
+                    }
 
                     slot.addEventListener('click', () => {
-                        const key = `${dayIndex}-${hour}`;
                         slots[key] = currentMode;
                         slot.className = `time-slot ${currentMode}`;
                     });
 
-                    grid.appendChild(slot);
+                    cell.appendChild(slot);
+                    row.appendChild(cell);
                 });
-            });
+
+                body.appendChild(row);
+            }
         }
 
-        document.getElementById('save-button').addEventListener('click', () => {
-            tg.sendData(JSON.stringify(slots));
-            tg.close();
+        async function loadExisting(){
+            if (!playerId || !tourId) return;
+
+            try {
+                const res = await fetch(`/api/availability/tour/${tourId}/player/${playerId}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data) {
+                        loadJsonMaps(data.availableSlots, data.unavailableSlots);
+                        renderCalendar();
+                    }
+                }
+            } catch (e) {
+                console.error('load error', e);
+            }
+        }
+
+        function loadJsonMaps(availJson, unavailJson) {
+            try {
+                const a = availJson ? JSON.parse(availJson) : {};
+                Object.entries(a).forEach(([day, hours]) => {
+                    hours.forEach(h => {
+                        const parts = day.split('-');
+                        const d = new Date(`${parts[2]}-${parts[1]}-${parts[0]}T${String(h).padStart(2, '0')}:00:00Z`);
+                        slots[d.toISOString()] = 'green';
+                    });
+                });
+                const u = unavailJson ? JSON.parse(unavailJson) : {};
+                Object.entries(u).forEach(([day, hours]) => {
+                    hours.forEach(h => {
+                        const parts = day.split('-');
+                        const d = new Date(`${parts[2]}-${parts[1]}-${parts[0]}T${String(h).padStart(2, '0')}:00:00Z`);
+                        slots[d.toISOString()] = 'red';
+                    });
+                });
+            } catch (e) {
+                console.error('parse error', e);
+            }
+        }
+
+        document.getElementById('save-button').addEventListener('click', async () => {
+            if (!playerId || !tourId) {
+                tg.showAlert('Missing player or tour');
+                return;
+            }
+
+            const availableMap = {};
+            const unavailableMap = {};
+
+            Object.entries(slots).forEach(([iso, mode]) => {
+                const d = new Date(iso);
+                const day = `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth()+1).padStart(2, '0')}-${d.getFullYear()}`;
+                const hour = d.getHours();
+                if (mode === 'red') {
+                    if (!unavailableMap[day]) unavailableMap[day] = [];
+                    unavailableMap[day].push(hour);
+                } else if (mode === 'green') {
+                    if (!availableMap[day]) availableMap[day] = [];
+                    availableMap[day].push(hour);
+                }
+            });
+
+            Object.values(availableMap).forEach(arr => arr.sort((a, b) => a - b));
+            Object.values(unavailableMap).forEach(arr => arr.sort((a, b) => a - b));
+
+            try {
+                const res = await fetch(`/api/availability/tour/${tourId}/player/${playerId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        availableSlots: JSON.stringify(availableMap),
+                        unavailableSlots: JSON.stringify(unavailableMap)
+                    })
+                });
+                if (res.ok) {
+                    tg.showAlert('Saved');
+                    tg.close();
+                } else {
+                    tg.showAlert('Save failed');
+                }
+            } catch (e) {
+                console.error('save', e);
+                tg.showAlert('Error');
+            }
         });
 
-        setMode('green');
-        initCalendar();
+        if (tourStartDate) currentWeekStart = new Date(tourStartDate);
+
+        setMode('green'); loadExisting().then(() => renderCalendar());
     </script>
 </body>
 </html>
-

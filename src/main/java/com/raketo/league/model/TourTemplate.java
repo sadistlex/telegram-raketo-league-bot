@@ -6,25 +6,23 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "tournaments")
+@Table(name = "tour_templates")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Tournament {
+public class TourTemplate {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
-    private String name;
-
-    private String description;
-
-    @Column(name = "is_active", nullable = false)
-    @Builder.Default
-    private Boolean isActive = true;
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "divisions_tournaments_id")
+    private DivisionTournament divisionTournament;
 
     @Column(name = "start_date", nullable = false)
     private LocalDateTime startDate;
+
+    @Column(name = "end_date", nullable = false)
+    private LocalDateTime endDate;
 }

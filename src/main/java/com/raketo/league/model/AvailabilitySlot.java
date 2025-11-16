@@ -12,38 +12,28 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Builder
 public class AvailabilitySlot {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(name = "available_slots", columnDefinition = "TEXT")
+    private String availableSlots;
+
+    @Column(name = "unavailable_slots", columnDefinition = "TEXT")
+    private String unavailableSlots;
+
+    @ManyToOne
+    @JoinColumn(name = "tour_id", nullable = false)
+    private Tour tour;
 
     @ManyToOne
     @JoinColumn(name = "player_id", nullable = false)
     private Player player;
 
-    @ManyToOne
-    @JoinColumn(name = "match_id")
-    private Match match;
-
-    @Column(nullable = false)
-    private LocalDateTime startTime;
-
-    @Column(nullable = false)
-    private LocalDateTime endTime;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    @Builder.Default
-    private AvailabilityType type = AvailabilityType.YELLOW;
-
-    @Column(nullable = false, updatable = false)
+    @Column(name = "created_at", nullable = false)
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
 
-    public enum AvailabilityType {
-        GREEN,
-        YELLOW,
-        RED
-    }
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
 }
-

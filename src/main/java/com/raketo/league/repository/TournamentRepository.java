@@ -8,9 +8,5 @@ import java.util.List;
 
 @Repository
 public interface TournamentRepository extends JpaRepository<Tournament, Long> {
-
-    List<Tournament> findByStatus(Tournament.TournamentStatus status);
-
-    List<Tournament> findByStatusOrderByStartDateDesc(Tournament.TournamentStatus status);
+    List<Tournament> findByIsActiveTrue();
 }
-

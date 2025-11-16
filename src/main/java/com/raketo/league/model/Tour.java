@@ -4,8 +4,6 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
-import java.util.HashSet;
-import java.util.Set;
 
 @Entity
 @Table(name = "tours")
@@ -14,41 +12,24 @@ import java.util.Set;
 @AllArgsConstructor
 @Builder
 public class Tour {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne
-    @JoinColumn(name = "division_id", nullable = false)
-    private Division division;
-
-    @Column(nullable = false)
-    private Integer tourNumber;
-
-    @Column(nullable = false)
-    private LocalDateTime startDate;
-
-    @Column(nullable = false)
-    private LocalDateTime endDate;
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "tour_template_id")
+    private TourTemplate tourTemplate;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     @Builder.Default
-    private TourStatus status = TourStatus.SCHEDULED;
+    private TourStatus status = TourStatus.Active;
 
-    @OneToMany(mappedBy = "tour", cascade = CascadeType.ALL, orphanRemoval = true)
-    @Builder.Default
-    private Set<Match> matches = new HashSet<>();
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
 
-    @Column(nullable = false, updatable = false)
-    @Builder.Default
-    private LocalDateTime createdAt = LocalDateTime.now();
+    @Column(name = "complete_date")
+    private LocalDateTime completeDate;
 
-    public enum TourStatus {
-        SCHEDULED,
-        ACTIVE,
-        COMPLETED
-    }
+    public enum TourStatus { Active, Walkover, Completed, Cancelled }
 }
-

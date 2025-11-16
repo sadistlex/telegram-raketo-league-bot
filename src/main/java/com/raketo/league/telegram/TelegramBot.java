@@ -50,8 +50,10 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     private void handleTextMessage(Update update) {
         Long userId = update.getMessage().getFrom().getId();
+        String text = update.getMessage().getText();
+        boolean isAdmin = adminService.isAdmin(userId);
 
-        if (adminService.isAdmin(userId)) {
+        if (isAdmin && BotCommand.isAdminCommand(text)) {
             adminCommandHandler.handleCommand(update, this);
         } else {
             playerCommandHandler.handleCommand(update, this);
@@ -60,12 +62,19 @@ public class TelegramBot extends TelegramLongPollingBot {
 
     private void handleCallbackQuery(Update update) {
         Long userId = update.getCallbackQuery().getFrom().getId();
+        String callbackData = update.getCallbackQuery().getData();
+        boolean isAdmin = adminService.isAdmin(userId);
 
-        if (adminService.isAdmin(userId)) {
+        if (isAdmin && isAdminCallback(callbackData)) {
             adminCommandHandler.handleCallback(update, this);
         } else {
             playerCommandHandler.handleCallback(update, this);
         }
+    }
+
+
+    private boolean isAdminCallback(String callbackData) {
+        return callbackData != null && callbackData.startsWith("ADMIN_");
     }
 
     public void sendMessage(Long chatId, String text) {

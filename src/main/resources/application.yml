@@ -22,6 +22,9 @@ telegram:
     username: ${TELEGRAM_BOT_USERNAME}
     webapp-url: ${WEBAPP_URL:http://localhost:8080/webapp}
 
+app:
+  base-url: ${BASE_URL:http://localhost:8080}
+
 server:
   port: ${SERVER_PORT:8080}
 
