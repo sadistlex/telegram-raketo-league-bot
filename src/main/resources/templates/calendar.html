@@ -246,6 +246,7 @@
         let currentWeekStart = new Date();
         let weekDates = [];
         let isDragging = false;
+        let dragAction = null;
 
         const startHour = 0;
         const endHour = 23;
@@ -258,8 +259,14 @@
         document.getElementById('prev-week').addEventListener('click', () => changeWeek(-1));
         document.getElementById('next-week').addEventListener('click', () => changeWeek(1));
 
-        document.addEventListener('mouseup', () => isDragging = false);
-        document.addEventListener('touchend', () => isDragging = false);
+        document.addEventListener('mouseup', () => {
+            isDragging = false;
+            dragAction = null;
+        });
+        document.addEventListener('touchend', () => {
+            isDragging = false;
+            dragAction = null;
+        });
 
         function setMode(m){
             currentMode = m;
@@ -389,9 +396,11 @@
                         e.preventDefault();
                         isDragging = true;
                         if (slots[key] === currentMode) {
+                            dragAction = 'unset';
                             delete slots[key];
                             slot.className = 'time-slot yellow';
                         } else {
+                            dragAction = 'set';
                             slots[key] = currentMode;
                             slot.className = `time-slot ${currentMode}`;
                         }
@@ -399,8 +408,13 @@
 
                     slot.addEventListener('mouseenter', () => {
                         if (isDragging) {
-                            slots[key] = currentMode;
-                            slot.className = `time-slot ${currentMode}`;
+                            if (dragAction === 'set') {
+                                slots[key] = currentMode;
+                                slot.className = `time-slot ${currentMode}`;
+                            } else if (dragAction === 'unset') {
+                                delete slots[key];
+                                slot.className = 'time-slot yellow';
+                            }
                         }
                     });
 
@@ -408,9 +422,11 @@
                         e.preventDefault();
                         isDragging = true;
                         if (slots[key] === currentMode) {
+                            dragAction = 'unset';
                             delete slots[key];
                             slot.className = 'time-slot yellow';
                         } else {
+                            dragAction = 'set';
                             slots[key] = currentMode;
                             slot.className = `time-slot ${currentMode}`;
                         }
@@ -421,11 +437,26 @@
                             const touch = e.touches[0];
                             const element = document.elementFromPoint(touch.clientX, touch.clientY);
                             if (element && element.classList.contains('time-slot')) {
-                                const touchSlotDate = new Date(date);
-                                touchSlotDate.setHours(hour, 0, 0, 0);
-                                const touchKey = touchSlotDate.toISOString();
-                                slots[touchKey] = currentMode;
-                                element.className = `time-slot ${currentMode}`;
+                                const parent = element.parentElement;
+                                const row = parent.parentElement;
+                                const cellIndex = Array.from(row.children).indexOf(parent) - 1;
+                                const rowIndex = Array.from(row.parentElement.children).indexOf(row);
+
+                                if (cellIndex >= 0 && cellIndex < weekDates.length && rowIndex >= 0) {
+                                    const touchDate = weekDates[cellIndex];
+                                    const touchHour = startHour + rowIndex;
+                                    const touchSlotDate = new Date(touchDate);
+                                    touchSlotDate.setHours(touchHour, 0, 0, 0);
+                                    const touchKey = touchSlotDate.toISOString();
+
+                                    if (dragAction === 'set') {
+                                        slots[touchKey] = currentMode;
+                                        element.className = `time-slot ${currentMode}`;
+                                    } else if (dragAction === 'unset') {
+                                        delete slots[touchKey];
+                                        element.className = 'time-slot yellow';
+                                    }
+                                }
                             }
                         }
                     });
@@ -536,7 +567,6 @@
                     })
                 });
                 if (res.ok) {
-                    tg.showAlert('Saved');
                     tg.close();
                 } else {
                     tg.showAlert('Save failed');
