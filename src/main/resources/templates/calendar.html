@@ -198,11 +198,11 @@
     <div class="legend">
         <div class="legend-item">
             <div class="legend-color green"></div>
-            <span>Preferred</span>
+            <span>Available</span>
         </div>
         <div class="legend-item">
             <div class="legend-color yellow"></div>
-            <span>Available</span>
+            <span>Maybe (Auto)</span>
         </div>
         <div class="legend-item">
             <div class="legend-color red"></div>
@@ -211,9 +211,8 @@
     </div>
 
     <div class="controls">
-        <button class="green" id="btn-green">Green</button>
-        <button class="yellow" id="btn-yellow">Yellow</button>
-        <button class="red" id="btn-red">Red</button>
+        <button class="green" id="btn-green">Available</button>
+        <button class="red" id="btn-red">Busy</button>
     </div>
 
     <div class="calendar-container">
@@ -243,18 +242,24 @@
         const tourEndDate = /*[[${tourEndDate}]]*/ null;
 
         let currentMode = 'green';
-        let slots = {}; // ISO -> mode
+        let slots = {};
         let currentWeekStart = new Date();
         let weekDates = [];
+        let isDragging = false;
 
-        const startHour = 8;
+        const startHour = 0;
         const endHour = 23;
 
+        const tourStart = tourStartDate ? new Date(tourStartDate) : null;
+        const tourEnd = tourEndDate ? new Date(tourEndDate) : null;
+
         document.getElementById('btn-green').addEventListener('click', () => setMode('green'));
-        document.getElementById('btn-yellow').addEventListener('click', () => setMode('yellow'));
         document.getElementById('btn-red').addEventListener('click', () => setMode('red'));
         document.getElementById('prev-week').addEventListener('click', () => changeWeek(-1));
         document.getElementById('next-week').addEventListener('click', () => changeWeek(1));
+
+        document.addEventListener('mouseup', () => isDragging = false);
+        document.addEventListener('touchend', () => isDragging = false);
 
         function setMode(m){
             currentMode = m;
@@ -263,7 +268,20 @@
         }
 
         function changeWeek(o){
-            currentWeekStart.setDate(currentWeekStart.getDate() + (o * 7));
+            const newWeekStart = new Date(currentWeekStart);
+            newWeekStart.setDate(newWeekStart.getDate() + (o * 7));
+
+            if (tourStart && tourEnd) {
+                const newMonday = getMonday(newWeekStart);
+                const newSunday = new Date(newMonday);
+                newSunday.setDate(newSunday.getDate() + 6);
+
+                if (newMonday < tourStart || newSunday > tourEnd) {
+                    return;
+                }
+            }
+
+            currentWeekStart = newWeekStart;
             renderCalendar();
         }
 
@@ -279,6 +297,39 @@
             const month = String(date.getMonth() + 1).padStart(2, '0');
             return `${day}.${month}`;
         }
+
+        function setPresetTimes() {
+            const now = new Date();
+            if (tourStart) {
+                currentWeekStart = new Date(tourStart);
+            }
+
+            for (let d = new Date(tourStart); d <= tourEnd; d.setDate(d.getDate() + 1)) {
+                for (let hour = 0; hour <= 23; hour++) {
+                    const slotDate = new Date(d);
+                    slotDate.setHours(hour, 0, 0, 0);
+                    const key = slotDate.toISOString();
+
+                    if ((hour >= 22 && hour <= 23) || (hour >= 0 && hour <= 10)) {
+                        slots[key] = 'red';
+                    } else if (hour >= 11 && hour <= 21) {
+                        slots[key] = 'green';
+                    }
+                }
+            }
+        }
+
+        function fillDay(date, mode) {
+            for (let hour = 0; hour <= 23; hour++) {
+                const slotDate = new Date(date);
+                slotDate.setHours(hour, 0, 0, 0);
+                const key = slotDate.toISOString();
+                slots[key] = mode;
+            }
+            renderCalendar();
+        }
+
+        window.fillDay = fillDay;
 
         function renderCalendar(){
             const monday = getMonday(currentWeekStart);
@@ -296,9 +347,19 @@
             const header = document.getElementById('calendar-header');
             const body = document.getElementById('calendar-body');
 
-            header.innerHTML = '<tr><th></th>' +
-                weekDates.map(d => `<th>${['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][d.getDay() === 0 ? 6 : d.getDay()-1]}<br/>${formatDate(d)}</th>`).join('') +
-                '</tr>';
+            let headerHtml = '<tr><th></th>';
+            weekDates.forEach((d, idx) => {
+                const dayName = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][d.getDay() === 0 ? 6 : d.getDay()-1];
+                headerHtml += `<th>
+                    ${dayName}<br/>${formatDate(d)}<br/>
+                    <div style="margin-top: 4px; display: flex; gap: 2px; justify-content: center;">
+                        <button onclick="fillDay(weekDates[${idx}], 'green')" style="padding: 2px 6px; font-size: 10px; background: #4caf50; color: white; border: none; border-radius: 3px; cursor: pointer;">✓</button>
+                        <button onclick="fillDay(weekDates[${idx}], 'red')" style="padding: 2px 6px; font-size: 10px; background: #f44336; color: white; border: none; border-radius: 3px; cursor: pointer;">✗</button>
+                    </div>
+                </th>`;
+            });
+            headerHtml += '</tr>';
+            header.innerHTML = headerHtml;
 
             body.innerHTML = '';
 
@@ -320,11 +381,53 @@
 
                     if (slots[key]) {
                         slot.classList.add(slots[key]);
+                    } else {
+                        slot.classList.add('yellow');
                     }
 
-                    slot.addEventListener('click', () => {
-                        slots[key] = currentMode;
-                        slot.className = `time-slot ${currentMode}`;
+                    slot.addEventListener('mousedown', (e) => {
+                        e.preventDefault();
+                        isDragging = true;
+                        if (slots[key] === currentMode) {
+                            delete slots[key];
+                            slot.className = 'time-slot yellow';
+                        } else {
+                            slots[key] = currentMode;
+                            slot.className = `time-slot ${currentMode}`;
+                        }
+                    });
+
+                    slot.addEventListener('mouseenter', () => {
+                        if (isDragging) {
+                            slots[key] = currentMode;
+                            slot.className = `time-slot ${currentMode}`;
+                        }
+                    });
+
+                    slot.addEventListener('touchstart', (e) => {
+                        e.preventDefault();
+                        isDragging = true;
+                        if (slots[key] === currentMode) {
+                            delete slots[key];
+                            slot.className = 'time-slot yellow';
+                        } else {
+                            slots[key] = currentMode;
+                            slot.className = `time-slot ${currentMode}`;
+                        }
+                    });
+
+                    slot.addEventListener('touchmove', (e) => {
+                        if (isDragging) {
+                            const touch = e.touches[0];
+                            const element = document.elementFromPoint(touch.clientX, touch.clientY);
+                            if (element && element.classList.contains('time-slot')) {
+                                const touchSlotDate = new Date(date);
+                                touchSlotDate.setHours(hour, 0, 0, 0);
+                                const touchKey = touchSlotDate.toISOString();
+                                slots[touchKey] = currentMode;
+                                element.className = `time-slot ${currentMode}`;
+                            }
+                        }
                     });
 
                     cell.appendChild(slot);
@@ -332,6 +435,29 @@
                 });
 
                 body.appendChild(row);
+            }
+
+            updateWeekButtons();
+        }
+
+        function updateWeekButtons() {
+            const prevBtn = document.getElementById('prev-week');
+            const nextBtn = document.getElementById('next-week');
+
+            if (tourStart && tourEnd) {
+                const monday = getMonday(currentWeekStart);
+                const prevMonday = new Date(monday);
+                prevMonday.setDate(prevMonday.getDate() - 7);
+
+                const sunday = new Date(monday);
+                sunday.setDate(sunday.getDate() + 6);
+                const nextMonday = new Date(monday);
+                nextMonday.setDate(nextMonday.getDate() + 7);
+                const nextSunday = new Date(nextMonday);
+                nextSunday.setDate(nextSunday.getDate() + 6);
+
+                prevBtn.disabled = prevMonday < tourStart;
+                nextBtn.disabled = nextSunday > tourEnd;
             }
         }
 
@@ -423,7 +549,9 @@
 
         if (tourStartDate) currentWeekStart = new Date(tourStartDate);
 
-        setMode('green'); loadExisting().then(() => renderCalendar());
+        setMode('green');
+        setPresetTimes();
+        loadExisting().then(() => renderCalendar());
     </script>
 </body>
 </html>

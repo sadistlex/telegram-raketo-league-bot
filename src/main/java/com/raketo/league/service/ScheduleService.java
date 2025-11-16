@@ -1,8 +1,10 @@
 package com.raketo.league.service;
 
+import com.raketo.league.model.AvailabilitySlot;
 import com.raketo.league.model.Player;
 import com.raketo.league.model.Tour;
 import com.raketo.league.model.TourPlayer;
+import com.raketo.league.repository.AvailabilitySlotRepository;
 import com.raketo.league.repository.TourPlayerRepository;
 import com.raketo.league.repository.TourRepository;
 import lombok.RequiredArgsConstructor;
@@ -19,8 +21,9 @@ import java.util.stream.Collectors;
 public class ScheduleService {
     private final TourRepository tourRepository;
     private final TourPlayerRepository tourPlayerRepository;
+    private final AvailabilitySlotRepository availabilitySlotRepository;
     private static final ZoneId ZONE_ID = ZoneId.of("Asia/Tbilisi");
-    private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd.MM HH.mm").withZone(ZONE_ID);
+    private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd.MM").withZone(ZONE_ID);
 
     @Transactional(readOnly = true)
     public PlayerSchedule buildPlayerSchedule(Player player) {
@@ -43,9 +46,14 @@ public class ScheduleService {
         sb.append("Player: ").append(schedule.player().getName()).append(" (@").append(schedule.player().getTelegramUsername()).append(")\n\n");
         if (schedule.tours().isEmpty()) sb.append("No tours assigned yet.");
         for (TourInfo ti : schedule.tours()) {
+            List<AvailabilitySlot> availabilitySlots = availabilitySlotRepository.findByPlayerIdAndTourId(
+                    schedule.player().getId(), ti.tourId());
+            String availabilityStatus = availabilitySlots.isEmpty() ? "Not Set" : "Set";
+
             sb.append("Tour ").append(ti.tourId()).append(" (")
                     .append(DATE_FMT.format(ti.startDate())).append("-")
-                    .append(DATE_FMT.format(ti.endDate())).append(") Status: ").append(ti.status()).append("\n");
+                    .append(DATE_FMT.format(ti.endDate())).append(") Status: ").append(ti.status())
+                    .append(", Availability: ").append(availabilityStatus).append("\n");
             if (ti.opponent() != null) sb.append("Opponent: ").append(ti.opponent().getName()).append("\n");
             sb.append("\n");
         }

@@ -114,7 +114,34 @@ public class AdminCommandHandler {
                 .text("📊 List Divisions")
                 .callbackData("ADMIN_CMD_LIST_DIVISIONS")
                 .build();
-        keyboard.add(List.of(listDivisionsBtn));
+
+        InlineKeyboardButton createTournamentBtn = InlineKeyboardButton.builder()
+                .text("➕ Create Tournament")
+                .callbackData("ADMIN_CMD_CREATE_TOURNAMENT")
+                .build();
+        keyboard.add(List.of(listDivisionsBtn, createTournamentBtn));
+
+        InlineKeyboardButton addPlayerBtn = InlineKeyboardButton.builder()
+                .text("👤➕ Add Player")
+                .callbackData("ADMIN_CMD_ADD_PLAYER")
+                .build();
+
+        InlineKeyboardButton assignPlayerBtn = InlineKeyboardButton.builder()
+                .text("📝 Assign Player")
+                .callbackData("ADMIN_CMD_ASSIGN_PLAYER")
+                .build();
+        keyboard.add(List.of(addPlayerBtn, assignPlayerBtn));
+
+        InlineKeyboardButton generateToursBtn = InlineKeyboardButton.builder()
+                .text("🗓️ Generate Tours")
+                .callbackData("ADMIN_CMD_GENERATE_TOURS")
+                .build();
+
+        InlineKeyboardButton viewScheduleBtn = InlineKeyboardButton.builder()
+                .text("📅 View Schedule")
+                .callbackData("ADMIN_CMD_VIEW_SCHEDULE")
+                .build();
+        keyboard.add(List.of(generateToursBtn, viewScheduleBtn));
 
         InlineKeyboardButton helpBtn = InlineKeyboardButton.builder()
                 .text("📖 Command Help")
@@ -143,6 +170,21 @@ public class AdminCommandHandler {
                 break;
             case "ADMIN_CMD_LIST_DIVISIONS":
                 handleListDivisions(chatId, bot);
+                break;
+            case "ADMIN_CMD_CREATE_TOURNAMENT":
+                bot.sendMessage(chatId, "Use command: " + BotCommand.CREATE_TOURNAMENT.getCommand() + " <name> <description> <startDate:yyyy-MM-dd>");
+                break;
+            case "ADMIN_CMD_ADD_PLAYER":
+                bot.sendMessage(chatId, "Use command: " + BotCommand.ADD_PLAYER.getCommand() + " <@username> <name>");
+                break;
+            case "ADMIN_CMD_ASSIGN_PLAYER":
+                bot.sendMessage(chatId, "Use command: " + BotCommand.ASSIGN_PLAYER.getCommand() + " <playerId> <divisionTournamentId>");
+                break;
+            case "ADMIN_CMD_GENERATE_TOURS":
+                bot.sendMessage(chatId, "Use command: " + BotCommand.GENERATE_TOURS.getCommand() + " <divisionTournamentId> <start:yyyy-MM-dd> <intervalDays>");
+                break;
+            case "ADMIN_CMD_VIEW_SCHEDULE":
+                bot.sendMessage(chatId, "Use command: " + BotCommand.VIEW_SCHEDULE.getCommand() + " <divisionTournamentId>");
                 break;
             default:
                 bot.sendMessage(chatId, "Unknown command");
