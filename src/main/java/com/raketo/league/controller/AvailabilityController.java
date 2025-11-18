@@ -43,6 +43,11 @@ public class AvailabilityController {
         return ResponseEntity.ok().build();
     }
 
+    @GetMapping("/compatible/{tourId}/{playerId}/{opponentId}")
+    public ResponseEntity<Map<String, Object>> getCompatibleTimes(@PathVariable Long tourId, @PathVariable Long playerId, @PathVariable Long opponentId) {
+        return ResponseEntity.ok(availabilityService.getCompatibleTimes(tourId, playerId, opponentId));
+    }
+
     @Data
     public static class AvailabilityPayload {
         private String availableSlots;

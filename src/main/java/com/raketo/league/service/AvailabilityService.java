@@ -13,14 +13,12 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class AvailabilityService {
     private final AvailabilitySlotRepository availabilitySlotRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final DateTimeFormatter dayFormatter = DateTimeFormatter.ofPattern("dd-MM-yyyy");
 
     @Transactional(readOnly = true)
     public List<AvailabilitySlot> getPlayerAvailability(Long playerId) {
@@ -55,7 +53,8 @@ public class AvailabilityService {
 
     @Transactional
     public void deletePlayerTourAvailability(Long tourId, Long playerId) {
-        availabilitySlotRepository.findByPlayerIdAndTourId(playerId, tourId).forEach(availabilitySlotRepository::delete);
+        List<AvailabilitySlot> slots = availabilitySlotRepository.findByPlayerIdAndTourId(playerId, tourId);
+        availabilitySlotRepository.deleteAll(slots);
     }
 
     @Transactional(readOnly = true)
@@ -75,15 +74,13 @@ public class AvailabilityService {
 
         if (a != null && b != null) {
             greenIntersections = computeGreenIntersections(
-                a.getAvailableSlots(), a.getUnavailableSlots(),
-                b.getAvailableSlots(), b.getUnavailableSlots()
+                a.getAvailableSlots(), b.getAvailableSlots()
             );
 
             if (greenIntersections.isEmpty()) {
                 yellowIntersections = computeYellowIntersections(
                     a.getAvailableSlots(), a.getUnavailableSlots(),
-                    b.getAvailableSlots(), b.getUnavailableSlots(),
-                    tourId
+                    b.getAvailableSlots(), b.getUnavailableSlots()
                 );
             }
         }
@@ -96,7 +93,24 @@ public class AvailabilityService {
         return result;
     }
 
-    private List<TimeIntersection> computeGreenIntersections(String availA, String unavailA, String availB, String unavailB) {
+    @Transactional(readOnly = true)
+    public Map<String, Object> getCompatibleTimes(Long tourId, Long playerId, Long opponentId) {
+        AvailabilitySlot player = availabilitySlotRepository.findByPlayerIdAndTourId(playerId, tourId).stream().findFirst().orElse(null);
+        AvailabilitySlot opponent = availabilitySlotRepository.findByPlayerIdAndTourId(opponentId, tourId).stream().findFirst().orElse(null);
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("tourId", tourId);
+        result.put("playerId", playerId);
+        result.put("opponentId", opponentId);
+        result.put("playerAvailableSlots", player != null ? player.getAvailableSlots() : "{}");
+        result.put("playerUnavailableSlots", player != null ? player.getUnavailableSlots() : "{}");
+        result.put("opponentAvailableSlots", opponent != null ? opponent.getAvailableSlots() : "{}");
+        result.put("opponentUnavailableSlots", opponent != null ? opponent.getUnavailableSlots() : "{}");
+
+        return result;
+    }
+
+    private List<TimeIntersection> computeGreenIntersections(String availA, String availB) {
         Map<String, List<Integer>> greenA = parse(availA);
         Map<String, List<Integer>> greenB = parse(availB);
 
@@ -122,7 +136,7 @@ public class AvailabilityService {
         return merge(list);
     }
 
-    private List<TimeIntersection> computeYellowIntersections(String availA, String unavailA, String availB, String unavailB, Long tourId) {
+    private List<TimeIntersection> computeYellowIntersections(String availA, String unavailA, String availB, String unavailB) {
         Map<String, List<Integer>> greenA = parse(availA);
         Map<String, List<Integer>> redA = parse(unavailA);
         Map<String, List<Integer>> greenB = parse(availB);
@@ -165,14 +179,14 @@ public class AvailabilityService {
 
     private Map<String, List<Integer>> parse(String json) {
         if (json == null || json.isBlank()) return Collections.emptyMap();
-        try { return objectMapper.readValue(json, new TypeReference<Map<String, List<Integer>>>() {}); } catch (Exception e) { return Collections.emptyMap(); }
+        try { return objectMapper.readValue(json, new TypeReference<>() {}); } catch (Exception e) { return Collections.emptyMap(); }
     }
 
     private List<TimeIntersection> merge(List<TimeIntersection> raw) {
         if (raw.isEmpty()) return raw;
-        List<TimeIntersection> sorted = raw.stream().sorted(Comparator.comparing(TimeIntersection::start)).collect(Collectors.toList());
+        List<TimeIntersection> sorted = raw.stream().sorted(Comparator.comparing(TimeIntersection::start)).toList();
         List<TimeIntersection> merged = new ArrayList<>();
-        TimeIntersection current = sorted.get(0);
+        TimeIntersection current = sorted.getFirst();
         for (int i = 1; i < sorted.size(); i++) {
             TimeIntersection next = sorted.get(i);
             if (!current.end.isBefore(next.start) && current.type.equals(next.type)) {

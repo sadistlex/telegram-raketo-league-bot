@@ -66,13 +66,12 @@ public class PlayerCommandHandler {
     private void handleStartCommand(Long chatId, Long userId, TelegramBot bot) {
         boolean isAdmin = adminService.isAdmin(userId);
 
-        StringBuilder message = new StringBuilder();
-        message.append("Welcome to Raketo League Bot!\n\n");
-        message.append("Use the buttons below to navigate:");
+        String message = "Welcome to Raketo League Bot!\n\n" +
+                "Use the buttons below to navigate:";
 
         SendMessage sendMessage = SendMessage.builder()
                 .chatId(chatId.toString())
-                .text(message.toString())
+                .text(message)
                 .replyMarkup(createPlayerMenuKeyboard(isAdmin))
                 .build();
 
@@ -126,12 +125,27 @@ public class PlayerCommandHandler {
         List<List<InlineKeyboardButton>> keyboard = new ArrayList<>();
 
         if (webappEnabled) {
+            int tourNumber = 1;
             for (ScheduleService.TourInfo ti : schedule.tours()) {
-                InlineKeyboardButton availabilityBtn = InlineKeyboardButton.builder()
-                        .text("Set Availability (Tour " + ti.tourId() + ")")
-                        .webApp(new WebAppInfo(baseUrl + "/webapp/calendar?playerId=" + schedule.player().getTelegramId() + "&tourId=" + ti.tourId()))
-                        .build();
-                keyboard.add(List.of(availabilityBtn));
+                if (ti.tourId() != null && ti.opponent() != null) {
+                    InlineKeyboardButton availabilityBtn = InlineKeyboardButton.builder()
+                            .text("Set Availability (Tour " + tourNumber + ")")
+                            .webApp(new WebAppInfo(baseUrl + "/webapp/calendar?playerId=" + schedule.player().getTelegramId() + "&tourId=" + ti.tourId()))
+                            .build();
+                    keyboard.add(List.of(availabilityBtn));
+
+                    boolean playerHasAvailability = availabilityService.getPlayerTourAvailability(schedule.player().getId(), ti.tourId()).isPresent();
+                    boolean opponentHasAvailability = availabilityService.getPlayerTourAvailability(ti.opponent().getId(), ti.tourId()).isPresent();
+
+                    if (playerHasAvailability && opponentHasAvailability) {
+                        InlineKeyboardButton compatibleTimesBtn = InlineKeyboardButton.builder()
+                                .text("Show Compatible Times (Tour " + tourNumber + ")")
+                                .webApp(new WebAppInfo(baseUrl + "/webapp/compatible?playerId=" + schedule.player().getTelegramId() + "&opponentId=" + ti.opponent().getTelegramId() + "&tourId=" + ti.tourId()))
+                                .build();
+                        keyboard.add(List.of(compatibleTimesBtn));
+                    }
+                }
+                tourNumber++;
             }
         }
 
@@ -157,13 +171,5 @@ public class PlayerCommandHandler {
         }
 
         bot.sendMessage(chatId, helpMessage.toString());
-    }
-
-    private void notifyAdminsNoDivision(Player player, TelegramBot bot) {
-        List<AdminUser> admins = adminService.getAllAdmins();
-        String text = "Player @" + player.getTelegramUsername() + " (" + player.getName() + ") has no divisions assigned.";
-        for (AdminUser admin : admins) {
-            bot.sendMessage(admin.getTelegramId(), text);
-        }
     }
 }

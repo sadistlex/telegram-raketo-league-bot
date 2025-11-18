@@ -37,4 +37,27 @@ public class WebAppController {
         }
         return "calendar";
     }
+
+    @GetMapping("/compatible")
+    public String compatibleTimes(@RequestParam Long playerId,
+                                   @RequestParam Long opponentId,
+                                   @RequestParam Long tourId,
+                                   Model model) {
+        Player player = playerService.findByTelegramId(playerId)
+                .orElseThrow(() -> new IllegalArgumentException("Player not found"));
+        Player opponent = playerService.findByTelegramId(opponentId)
+                .orElseThrow(() -> new IllegalArgumentException("Opponent not found"));
+        Tour tour = tourRepository.findById(tourId)
+                .orElseThrow(() -> new IllegalArgumentException("Tour not found"));
+
+        model.addAttribute("playerId", player.getId());
+        model.addAttribute("playerName", player.getName());
+        model.addAttribute("opponentId", opponent.getId());
+        model.addAttribute("opponentName", opponent.getName());
+        model.addAttribute("tourId", tour.getId());
+        model.addAttribute("tourStartDate", tour.getTourTemplate().getStartDate());
+        model.addAttribute("tourEndDate", tour.getTourTemplate().getEndDate());
+
+        return "compatible";
+    }
 }

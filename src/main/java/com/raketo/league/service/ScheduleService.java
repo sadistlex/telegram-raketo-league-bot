@@ -14,7 +14,6 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class ScheduleService {
-    private final TourRepository tourRepository;
     private final TourPlayerRepository tourPlayerRepository;
     private final AvailabilitySlotRepository availabilitySlotRepository;
     private final PlayerDivisionAssignmentRepository playerDivisionAssignmentRepository;
@@ -85,13 +84,20 @@ public class ScheduleService {
                         .append(DATE_FMT.format(ti.endDate())).append(") - ");
 
                 if (ti.opponent() != null) {
-                    List<AvailabilitySlot> availabilitySlots = availabilitySlotRepository.findByPlayerIdAndTourId(
+                    List<AvailabilitySlot> playerAvailabilitySlots = availabilitySlotRepository.findByPlayerIdAndTourId(
                             schedule.player().getId(), ti.tourId());
-                    String availabilityStatus = availabilitySlots.isEmpty() ? "Not Set" : "Set";
+                    String playerAvailabilityStatus = playerAvailabilitySlots.isEmpty() ? "Not Set" : "Set";
+
+                    List<AvailabilitySlot> opponentAvailabilitySlots = availabilitySlotRepository.findByPlayerIdAndTourId(
+                            ti.opponent().getId(), ti.tourId());
+                    String opponentAvailabilityStatus = opponentAvailabilitySlots.isEmpty() ? "Not Set" : "Set";
+
+                    String statusEmoji = getStatusEmoji(ti.status());
 
                     sb.append(ti.opponent().getName())
-                            .append(", Status: ").append(ti.status())
-                            .append(", Availability: ").append(availabilityStatus);
+                            .append(", ").append(statusEmoji)
+                            .append(", Availability: You: ").append(playerAvailabilityStatus)
+                            .append(", Opponent: ").append(opponentAvailabilityStatus);
                 } else {
                     sb.append("Bye");
                 }
@@ -101,6 +107,16 @@ public class ScheduleService {
             }
         }
         return sb.toString();
+    }
+
+    private String getStatusEmoji(Tour.TourStatus status) {
+        if (status == null) return "❓";
+        return switch (status) {
+            case Active -> "⏳";
+            case Completed -> "✅";
+            case Walkover -> "🏁";
+            case Cancelled -> "❌";
+        };
     }
 
     public record PlayerSchedule(Player player, List<TourInfo> tours) {}

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tour Availability</title>
+    <title>Compatible Times</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         * {
@@ -60,6 +60,10 @@
 
         .legend-color.red {
             background-color: #f44336;
+        }
+
+        .legend-color.selected {
+            background-color: #2196f3;
         }
 
         .calendar-container {
@@ -149,41 +153,17 @@
             background-color: #f44336;
         }
 
-        .controls {
-            display: flex;
-            gap: 8px;
-            margin-bottom: 16px;
+        .time-slot.selected {
+            background-color: #2196f3;
+            box-shadow: 0 0 0 2px #1976d2;
         }
 
-        .controls button {
-            flex: 1;
-            padding: 12px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: bold;
+        .time-slot.disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
         }
 
-        .controls button.green {
-            background-color: #4caf50;
-            color: white;
-        }
-
-        .controls button.yellow {
-            background-color: #ffeb3b;
-            color: black;
-        }
-
-        .controls button.red {
-            background-color: #f44336;
-            color: white;
-        }
-
-        .controls button.active {
-            box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.3);
-        }
-
-        .save-button {
+        .send-button {
             width: 100%;
             padding: 16px;
             background-color: var(--tg-theme-button-color, #007bff);
@@ -193,6 +173,12 @@
             font-size: 16px;
             font-weight: bold;
             cursor: pointer;
+            margin-top: 16px;
+        }
+
+        .send-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
 
         .loading {
@@ -203,28 +189,27 @@
 </head>
 <body>
     <div class="header">
-        <h1>Set Your Availability</h1>
-        <p>Select hours for this tour window</p>
+        <h1>Compatible Times</h1>
+        <p>Select time slots to send match request</p>
     </div>
 
     <div class="legend">
         <div class="legend-item">
             <div class="legend-color green"></div>
-            <span>Available</span>
+            <span>Both Available</span>
         </div>
         <div class="legend-item">
             <div class="legend-color yellow"></div>
-            <span>Maybe (Auto)</span>
+            <span>One Maybe</span>
         </div>
         <div class="legend-item">
             <div class="legend-color red"></div>
-            <span>Busy</span>
+            <span>Not Compatible</span>
         </div>
-    </div>
-
-    <div class="controls">
-        <button class="green" id="btn-green">Available</button>
-        <button class="red" id="btn-red">Busy</button>
+        <div class="legend-item">
+            <div class="legend-color selected"></div>
+            <span>Selected</span>
+        </div>
     </div>
 
     <div style="margin-bottom: 16px; text-align: center;">
@@ -248,23 +233,22 @@
         </div>
     </div>
 
-    <button class="save-button" id="save-button">Save Availability</button>
+    <button class="send-button" id="send-button" disabled>Send Match Request</button>
 
     <script th:inline="javascript">
         const tg = window.Telegram.WebApp;
         tg.expand();
 
         const playerId = /*[[${playerId}]]*/ null;
+        const opponentId = /*[[${opponentId}]]*/ null;
         const tourId = /*[[${tourId}]]*/ null;
         const tourStartDate = /*[[${tourStartDate}]]*/ null;
         const tourEndDate = /*[[${tourEndDate}]]*/ null;
 
-        let currentMode = 'green';
-        let slots = {};
+        let availabilityData = {};
+        let selectedSlots = {};
         let currentWeekStart = new Date();
         let weekDates = [];
-        let isDragging = false;
-        let dragAction = null;
         let showEarlyHours = false;
 
         const startHour = 0;
@@ -275,32 +259,15 @@
         const tourStart = tourStartDate ? new Date(tourStartDate) : null;
         const tourEnd = tourEndDate ? new Date(tourEndDate) : null;
 
-        document.getElementById('btn-green').addEventListener('click', () => setMode('green'));
-        document.getElementById('btn-red').addEventListener('click', () => setMode('red'));
         document.getElementById('prev-week').addEventListener('click', () => changeWeek(-1));
         document.getElementById('next-week').addEventListener('click', () => changeWeek(1));
         document.getElementById('toggle-early-hours').addEventListener('click', toggleEarlyHours);
-
-        document.addEventListener('mouseup', () => {
-            isDragging = false;
-            dragAction = null;
-        });
-        document.addEventListener('touchend', () => {
-            isDragging = false;
-            dragAction = null;
-        });
 
         function toggleEarlyHours() {
             showEarlyHours = !showEarlyHours;
             const btn = document.getElementById('toggle-early-hours');
             btn.textContent = showEarlyHours ? 'Hide 00:00-07:00' : 'Show 00:00-07:00';
             renderCalendar();
-        }
-
-        function setMode(m){
-            currentMode = m;
-            document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
-            document.getElementById(`btn-${m}`).classList.add('active');
         }
 
         function changeWeek(o){
@@ -334,38 +301,11 @@
             return `${day}.${month}`;
         }
 
-        function setPresetTimes() {
-            const now = new Date();
-            if (tourStart) {
-                currentWeekStart = new Date(tourStart);
-            }
-
-            for (let d = new Date(tourStart); d <= tourEnd; d.setDate(d.getDate() + 1)) {
-                for (let hour = 0; hour <= 23; hour++) {
-                    const slotDate = new Date(d);
-                    slotDate.setHours(hour, 0, 0, 0);
-                    const key = slotDate.toISOString();
-
-                    if ((hour >= 22 && hour <= 23) || (hour >= 0 && hour <= 10)) {
-                        slots[key] = 'red';
-                    } else if (hour >= 11 && hour <= 21) {
-                        slots[key] = 'green';
-                    }
-                }
-            }
+        function getSlotKey(date, hour) {
+            const slotDate = new Date(date);
+            slotDate.setHours(hour, 0, 0, 0);
+            return slotDate.toISOString();
         }
-
-        function fillDay(date, mode) {
-            for (let hour = 0; hour <= 23; hour++) {
-                const slotDate = new Date(date);
-                slotDate.setHours(hour, 0, 0, 0);
-                const key = slotDate.toISOString();
-                slots[key] = mode;
-            }
-            renderCalendar();
-        }
-
-        window.fillDay = fillDay;
 
         function renderCalendar(){
             const monday = getMonday(currentWeekStart);
@@ -384,15 +324,9 @@
             const body = document.getElementById('calendar-body');
 
             let headerHtml = '<tr><th class="time-header"></th>';
-            weekDates.forEach((d, idx) => {
+            weekDates.forEach((d) => {
                 const dayName = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][d.getDay() === 0 ? 6 : d.getDay()-1];
-                headerHtml += `<th>
-                    ${dayName}<br/>${formatDate(d)}<br/>
-                    <div style="margin-top: 4px; display: flex; gap: 2px; justify-content: center;">
-                        <button onclick="fillDay(weekDates[${idx}], 'green')" style="padding: 2px 6px; font-size: 10px; background: #4caf50; color: white; border: none; border-radius: 3px; cursor: pointer;">✓</button>
-                        <button onclick="fillDay(weekDates[${idx}], 'red')" style="padding: 2px 6px; font-size: 10px; background: #f44336; color: white; border: none; border-radius: 3px; cursor: pointer;">✗</button>
-                    </div>
-                </th>`;
+                headerHtml += `<th>${dayName}<br/>${formatDate(d)}</th>`;
             });
             headerHtml += '</tr>';
             header.innerHTML = headerHtml;
@@ -413,84 +347,20 @@
                     const slot = document.createElement('div');
                     slot.className = 'time-slot';
 
-                    const slotDate = new Date(date);
-                    slotDate.setHours(hour, 0, 0, 0);
-                    const key = slotDate.toISOString();
+                    const key = getSlotKey(date, hour);
+                    const compatibility = availabilityData[key] || 'red';
 
-                    if (slots[key]) {
-                        slot.classList.add(slots[key]);
-                    } else {
-                        slot.classList.add('yellow');
+                    slot.classList.add(compatibility);
+
+                    if (selectedSlots[key]) {
+                        slot.classList.add('selected');
                     }
 
-                    slot.addEventListener('mousedown', (e) => {
-                        e.preventDefault();
-                        isDragging = true;
-                        if (slots[key] === currentMode) {
-                            dragAction = 'unset';
-                            delete slots[key];
-                            slot.className = 'time-slot yellow';
-                        } else {
-                            dragAction = 'set';
-                            slots[key] = currentMode;
-                            slot.className = `time-slot ${currentMode}`;
-                        }
-                    });
-
-                    slot.addEventListener('mouseenter', () => {
-                        if (isDragging) {
-                            if (dragAction === 'set') {
-                                slots[key] = currentMode;
-                                slot.className = `time-slot ${currentMode}`;
-                            } else if (dragAction === 'unset') {
-                                delete slots[key];
-                                slot.className = 'time-slot yellow';
-                            }
-                        }
-                    });
-
-                    slot.addEventListener('touchstart', (e) => {
-                        e.preventDefault();
-                        isDragging = true;
-                        if (slots[key] === currentMode) {
-                            dragAction = 'unset';
-                            delete slots[key];
-                            slot.className = 'time-slot yellow';
-                        } else {
-                            dragAction = 'set';
-                            slots[key] = currentMode;
-                            slot.className = `time-slot ${currentMode}`;
-                        }
-                    });
-
-                    slot.addEventListener('touchmove', (e) => {
-                        if (isDragging) {
-                            const touch = e.touches[0];
-                            const element = document.elementFromPoint(touch.clientX, touch.clientY);
-                            if (element && element.classList.contains('time-slot')) {
-                                const parent = element.parentElement;
-                                const row = parent.parentElement;
-                                const cellIndex = Array.from(row.children).indexOf(parent) - 1;
-                                const rowIndex = Array.from(row.parentElement.children).indexOf(row);
-
-                                if (cellIndex >= 0 && cellIndex < weekDates.length && rowIndex >= 0) {
-                                    const touchDate = weekDates[cellIndex];
-                                    const touchHour = startHour + rowIndex;
-                                    const touchSlotDate = new Date(touchDate);
-                                    touchSlotDate.setHours(touchHour, 0, 0, 0);
-                                    const touchKey = touchSlotDate.toISOString();
-
-                                    if (dragAction === 'set') {
-                                        slots[touchKey] = currentMode;
-                                        element.className = `time-slot ${currentMode}`;
-                                    } else if (dragAction === 'unset') {
-                                        delete slots[touchKey];
-                                        element.className = 'time-slot yellow';
-                                    }
-                                }
-                            }
-                        }
-                    });
+                    if (compatibility === 'red') {
+                        slot.classList.add('disabled');
+                    } else {
+                        slot.addEventListener('click', () => toggleSlot(key, slot));
+                    }
 
                     cell.appendChild(slot);
                     row.appendChild(cell);
@@ -500,6 +370,23 @@
             }
 
             updateWeekButtons();
+            updateSendButton();
+        }
+
+        function toggleSlot(key, element) {
+            if (selectedSlots[key]) {
+                delete selectedSlots[key];
+                element.classList.remove('selected');
+            } else {
+                selectedSlots[key] = true;
+                element.classList.add('selected');
+            }
+            updateSendButton();
+        }
+
+        function updateSendButton() {
+            const hasSelections = Object.keys(selectedSlots).length > 0;
+            document.getElementById('send-button').disabled = !hasSelections;
         }
 
         function updateWeekButtons() {
@@ -523,103 +410,122 @@
             }
         }
 
-        async function loadExisting(){
-            if (!playerId || !tourId) return;
+        async function loadCompatibility(){
+            if (!playerId || !opponentId || !tourId) return;
 
             try {
-                const res = await fetch(`/api/availability/tour/${tourId}/player/${playerId}`);
+                const res = await fetch(`/api/availability/compatible/${tourId}/${playerId}/${opponentId}`);
                 if (res.ok) {
                     const data = await res.json();
-                    if (data && (data.availableSlots || data.unavailableSlots)) {
-                        loadJsonMaps(data.availableSlots, data.unavailableSlots);
-                        renderCalendar();
-                        return true;
-                    }
+                    processCompatibilityData(data);
+                    renderCalendar();
                 }
             } catch (e) {
                 console.error('load error', e);
             }
-            return false;
         }
 
-        function loadJsonMaps(availJson, unavailJson) {
+        function processCompatibilityData(data) {
+            const playerAvail = parseAvailabilityJson(data.playerAvailableSlots, data.playerUnavailableSlots);
+            const opponentAvail = parseAvailabilityJson(data.opponentAvailableSlots, data.opponentUnavailableSlots);
+
+            for (let d = new Date(tourStart); d <= tourEnd; d.setDate(d.getDate() + 1)) {
+                for (let hour = 0; hour <= 23; hour++) {
+                    const key = getSlotKey(d, hour);
+                    const playerStatus = playerAvail[key] || 'yellow';
+                    const opponentStatus = opponentAvail[key] || 'yellow';
+
+                    if (playerStatus === 'green' && opponentStatus === 'green') {
+                        availabilityData[key] = 'green';
+                    } else if ((playerStatus === 'green' || playerStatus === 'yellow') &&
+                               (opponentStatus === 'green' || opponentStatus === 'yellow')) {
+                        availabilityData[key] = 'yellow';
+                    } else {
+                        availabilityData[key] = 'red';
+                    }
+                }
+            }
+        }
+
+        function parseAvailabilityJson(availJson, unavailJson) {
+            const result = {};
             try {
-                slots = {};
                 const a = availJson ? JSON.parse(availJson) : {};
                 Object.entries(a).forEach(([day, hours]) => {
                     hours.forEach(h => {
                         const parts = day.split('-');
-                        const d = new Date(`${parts[2]}-${parts[1]}-${parts[0]}T${String(h).padStart(2, '0')}:00:00Z`);
-                        slots[d.toISOString()] = 'green';
+                        const key = getSlotKey(new Date(`${parts[2]}-${parts[1]}-${parts[0]}`), h);
+                        result[key] = 'green';
                     });
                 });
                 const u = unavailJson ? JSON.parse(unavailJson) : {};
                 Object.entries(u).forEach(([day, hours]) => {
                     hours.forEach(h => {
                         const parts = day.split('-');
-                        const d = new Date(`${parts[2]}-${parts[1]}-${parts[0]}T${String(h).padStart(2, '0')}:00:00Z`);
-                        slots[d.toISOString()] = 'red';
+                        const key = getSlotKey(new Date(`${parts[2]}-${parts[1]}-${parts[0]}`), h);
+                        result[key] = 'red';
                     });
                 });
             } catch (e) {
                 console.error('parse error', e);
             }
+            return result;
         }
 
-        document.getElementById('save-button').addEventListener('click', async () => {
-            if (!playerId || !tourId) {
-                tg.showAlert('Missing player or tour');
+        document.getElementById('send-button').addEventListener('click', async () => {
+            const requests = groupSlotsByDay();
+
+            if (requests.length === 0) {
+                tg.showAlert('No slots selected');
                 return;
             }
 
-            const availableMap = {};
-            const unavailableMap = {};
-
-            Object.entries(slots).forEach(([iso, mode]) => {
-                const d = new Date(iso);
-                const day = `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth()+1).padStart(2, '0')}-${d.getFullYear()}`;
-                const hour = d.getHours();
-                if (mode === 'red') {
-                    if (!unavailableMap[day]) unavailableMap[day] = [];
-                    unavailableMap[day].push(hour);
-                } else if (mode === 'green') {
-                    if (!availableMap[day]) availableMap[day] = [];
-                    availableMap[day].push(hour);
-                }
-            });
-
-            Object.values(availableMap).forEach(arr => arr.sort((a, b) => a - b));
-            Object.values(unavailableMap).forEach(arr => arr.sort((a, b) => a - b));
-
             try {
-                const res = await fetch(`/api/availability/tour/${tourId}/player/${playerId}`, {
+                const res = await fetch('/api/match-request', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        availableSlots: JSON.stringify(availableMap),
-                        unavailableSlots: JSON.stringify(unavailableMap)
+                        tourId: tourId,
+                        playerId: playerId,
+                        opponentId: opponentId,
+                        requests: requests
                     })
                 });
                 if (res.ok) {
                     tg.close();
                 } else {
-                    tg.showAlert('Save failed');
+                    tg.showAlert('Failed to send request');
                 }
             } catch (e) {
-                console.error('save', e);
+                console.error('send error', e);
                 tg.showAlert('Error');
             }
         });
 
+        function groupSlotsByDay() {
+            const dayGroups = {};
+
+            Object.keys(selectedSlots).forEach(key => {
+                const date = new Date(key);
+                const dayKey = `${String(date.getDate()).padStart(2, '0')}-${String(date.getMonth()+1).padStart(2, '0')}-${date.getFullYear()}`;
+                const hour = date.getHours();
+
+                if (!dayGroups[dayKey]) {
+                    dayGroups[dayKey] = [];
+                }
+                dayGroups[dayKey].push(hour);
+            });
+
+            return Object.entries(dayGroups).map(([day, hours]) => ({
+                day: day,
+                hours: hours.sort((a, b) => a - b)
+            }));
+        }
+
         if (tourStartDate) currentWeekStart = new Date(tourStartDate);
 
-        setMode('green');
-        loadExisting().then((hasData) => {
-            if (!hasData) {
-                setPresetTimes();
-            }
-            renderCalendar();
-        });
+        loadCompatibility();
     </script>
 </body>
 </html>
+
