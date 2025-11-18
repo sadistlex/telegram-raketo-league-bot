@@ -261,7 +261,7 @@ public class PlayerCommandHandler {
         }
 
         try {
-            scheduleRequestService.acceptRequest(requestId, player.getId());
+            scheduleRequestService.acceptRequest(requestId, player.getId(), bot::sendMessage);
             bot.sendMessage(chatId, "✅ Request accepted! Match has been scheduled.");
         } catch (Exception e) {
             bot.sendMessage(chatId, "❌ Failed to accept request: " + e.getMessage());
@@ -276,7 +276,7 @@ public class PlayerCommandHandler {
         }
 
         try {
-            scheduleRequestService.declineRequest(requestId, player.getId());
+            scheduleRequestService.declineRequest(requestId, player.getId(), bot::sendMessage);
             bot.sendMessage(chatId, "❌ Request declined.");
         } catch (Exception e) {
             bot.sendMessage(chatId, "❌ Failed to decline request: " + e.getMessage());

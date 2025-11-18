@@ -6,7 +6,6 @@ import com.raketo.league.model.ScheduleRequest;
 import com.raketo.league.model.Tour;
 import com.raketo.league.repository.ScheduleRequestRepository;
 import com.raketo.league.repository.TourRepository;
-import com.raketo.league.telegram.TelegramBot;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,13 +13,13 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.function.BiConsumer;
 
 @Service
 @RequiredArgsConstructor
 public class ScheduleRequestService {
     private final ScheduleRequestRepository scheduleRequestRepository;
     private final TourRepository tourRepository;
-    private final TelegramBot telegramBot;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Transactional(readOnly = true)
@@ -35,7 +34,7 @@ public class ScheduleRequestService {
     }
 
     @Transactional
-    public void acceptRequest(Long requestId, Long acceptingPlayerId) {
+    public void acceptRequest(Long requestId, Long acceptingPlayerId, BiConsumer<Long, String> messageSender) {
         ScheduleRequest request = scheduleRequestRepository.findById(requestId)
                 .orElseThrow(() -> new IllegalArgumentException("Request not found"));
 
@@ -66,11 +65,14 @@ public class ScheduleRequestService {
         tour.setUpdatedAt(LocalDateTime.now());
         tourRepository.save(tour);
 
-        sendAcceptanceNotification(request);
+        if (messageSender != null) {
+            String notification = buildAcceptanceNotification(request);
+            messageSender.accept(request.getInitiatorPlayer().getTelegramId(), notification);
+        }
     }
 
     @Transactional
-    public void declineRequest(Long requestId, Long decliningPlayerId) {
+    public void declineRequest(Long requestId, Long decliningPlayerId, BiConsumer<Long, String> messageSender) {
         ScheduleRequest request = scheduleRequestRepository.findById(requestId)
                 .orElseThrow(() -> new IllegalArgumentException("Request not found"));
 
@@ -86,10 +88,13 @@ public class ScheduleRequestService {
         request.setUpdatedAt(LocalDateTime.now());
         scheduleRequestRepository.save(request);
 
-        sendDeclineNotification(request);
+        if (messageSender != null) {
+            String notification = buildDeclineNotification(request);
+            messageSender.accept(request.getInitiatorPlayer().getTelegramId(), notification);
+        }
     }
 
-    private void sendAcceptanceNotification(ScheduleRequest request) {
+    private String buildAcceptanceNotification(ScheduleRequest request) {
         DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy");
 
         StringBuilder msg = new StringBuilder();
@@ -105,10 +110,10 @@ public class ScheduleRequestService {
         } catch (Exception e) {
         }
 
-        telegramBot.sendMessage(request.getInitiatorPlayer().getTelegramId(), msg.toString());
+        return msg.toString();
     }
 
-    private void sendDeclineNotification(ScheduleRequest request) {
+    private String buildDeclineNotification(ScheduleRequest request) {
         DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy");
 
         StringBuilder msg = new StringBuilder();
@@ -116,7 +121,7 @@ public class ScheduleRequestService {
         msg.append("Opponent: ").append(request.getRecipientPlayer().getName()).append("\n");
         msg.append("Date: ").append(request.getProposedDate().format(dateFormatter)).append("\n");
 
-        telegramBot.sendMessage(request.getInitiatorPlayer().getTelegramId(), msg.toString());
+        return msg.toString();
     }
 
     private String formatHours(List<Integer> hours) {
@@ -177,7 +182,7 @@ public class ScheduleRequestService {
             case Pending -> "⏳";
             case Accepted -> "✅";
             case Declined -> "❌";
-            case Expired -> "⌛";
+            case Expired -> "🕐";
             case Cancelled -> "🚫";
         };
     }
