@@ -25,11 +25,14 @@ public class Tour {
     @Builder.Default
     private TourStatus status = TourStatus.Active;
 
+    @Column(name = "scheduled_time")
+    private LocalDateTime scheduledTime;
+
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
     @Column(name = "complete_date")
     private LocalDateTime completeDate;
 
-    public enum TourStatus { Active, Walkover, Completed, Cancelled }
+    public enum TourStatus { Active, Scheduled, Walkover, Completed, Cancelled }
 }

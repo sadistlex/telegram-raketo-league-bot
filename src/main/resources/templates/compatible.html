@@ -250,6 +250,8 @@
         let currentWeekStart = new Date();
         let weekDates = [];
         let showEarlyHours = false;
+        let isDragging = false;
+        let dragAction = null;
 
         const startHour = 0;
         const endHour = 23;
@@ -262,6 +264,15 @@
         document.getElementById('prev-week').addEventListener('click', () => changeWeek(-1));
         document.getElementById('next-week').addEventListener('click', () => changeWeek(1));
         document.getElementById('toggle-early-hours').addEventListener('click', toggleEarlyHours);
+
+        document.addEventListener('mouseup', () => {
+            isDragging = false;
+            dragAction = null;
+        });
+        document.addEventListener('touchend', () => {
+            isDragging = false;
+            dragAction = null;
+        });
 
         function toggleEarlyHours() {
             showEarlyHours = !showEarlyHours;
@@ -359,7 +370,77 @@
                     if (compatibility === 'red') {
                         slot.classList.add('disabled');
                     } else {
-                        slot.addEventListener('click', () => toggleSlot(key, slot));
+                        slot.addEventListener('mousedown', (e) => {
+                            e.preventDefault();
+                            isDragging = true;
+                            if (selectedSlots[key]) {
+                                dragAction = 'unselect';
+                                delete selectedSlots[key];
+                                slot.classList.remove('selected');
+                            } else {
+                                dragAction = 'select';
+                                selectedSlots[key] = true;
+                                slot.classList.add('selected');
+                            }
+                            updateSendButton();
+                        });
+
+                        slot.addEventListener('mouseenter', () => {
+                            if (isDragging && compatibility !== 'red') {
+                                if (dragAction === 'select') {
+                                    selectedSlots[key] = true;
+                                    slot.classList.add('selected');
+                                } else if (dragAction === 'unselect') {
+                                    delete selectedSlots[key];
+                                    slot.classList.remove('selected');
+                                }
+                                updateSendButton();
+                            }
+                        });
+
+                        slot.addEventListener('touchstart', (e) => {
+                            e.preventDefault();
+                            isDragging = true;
+                            if (selectedSlots[key]) {
+                                dragAction = 'unselect';
+                                delete selectedSlots[key];
+                                slot.classList.remove('selected');
+                            } else {
+                                dragAction = 'select';
+                                selectedSlots[key] = true;
+                                slot.classList.add('selected');
+                            }
+                            updateSendButton();
+                        });
+
+                        slot.addEventListener('touchmove', (e) => {
+                            if (isDragging) {
+                                const touch = e.touches[0];
+                                const element = document.elementFromPoint(touch.clientX, touch.clientY);
+                                if (element && element.classList.contains('time-slot') && !element.classList.contains('disabled')) {
+                                    const parent = element.parentElement;
+                                    const row = parent.parentElement;
+                                    const cellIndex = Array.from(row.children).indexOf(parent) - 1;
+                                    const rowIndex = Array.from(row.parentElement.children).indexOf(row);
+
+                                    if (cellIndex >= 0 && cellIndex < weekDates.length && rowIndex >= 0) {
+                                        const touchDate = weekDates[cellIndex];
+                                        const displayStartHour = showEarlyHours ? startHour : visibleStartHour;
+                                        const touchHour = displayStartHour + rowIndex;
+                                        const touchKey = getSlotKey(touchDate, touchHour);
+
+                                        if (dragAction === 'select') {
+                                            selectedSlots[touchKey] = true;
+                                            element.classList.add('selected');
+                                        } else if (dragAction === 'unselect') {
+                                            delete selectedSlots[touchKey];
+                                            element.classList.remove('selected');
+                                        }
+                                        updateSendButton();
+                                    }
+                                }
+                            }
+                        });
                     }
 
                     cell.appendChild(slot);
@@ -370,17 +451,6 @@
             }
 
             updateWeekButtons();
-            updateSendButton();
-        }
-
-        function toggleSlot(key, element) {
-            if (selectedSlots[key]) {
-                delete selectedSlots[key];
-                element.classList.remove('selected');
-            } else {
-                selectedSlots[key] = true;
-                element.classList.add('selected');
-            }
             updateSendButton();
         }
 

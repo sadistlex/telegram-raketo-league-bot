@@ -64,8 +64,9 @@ public class ScheduleService {
 
             Long tourId = tour != null ? tour.getId() : null;
             Tour.TourStatus status = tour != null ? tour.getStatus() : null;
+            java.time.LocalDateTime scheduledTime = tour != null ? tour.getScheduledTime() : null;
 
-            tourInfos.add(new TourInfo(tourId, template.getStartDate(), template.getEndDate(), status, opponent));
+            tourInfos.add(new TourInfo(tourId, template.getStartDate(), template.getEndDate(), status, opponent, scheduledTime));
         }
 
         return new PlayerSchedule(player, tourInfos);
@@ -95,9 +96,15 @@ public class ScheduleService {
                     String statusEmoji = getStatusEmoji(ti.status());
 
                     sb.append(ti.opponent().getName())
-                            .append(", ").append(statusEmoji)
-                            .append(", Availability: You: ").append(playerAvailabilityStatus)
-                            .append(", Opponent: ").append(opponentAvailabilityStatus);
+                            .append(", ").append(statusEmoji);
+
+                    if (ti.status() == Tour.TourStatus.Scheduled && ti.scheduledTime() != null) {
+                        DateTimeFormatter timeFmt = DateTimeFormatter.ofPattern("dd.MM HH:mm").withZone(ZONE_ID);
+                        sb.append(" ").append(timeFmt.format(ti.scheduledTime()));
+                    } else {
+                        sb.append(", Availability: You: ").append(playerAvailabilityStatus)
+                                .append(", Opponent: ").append(opponentAvailabilityStatus);
+                    }
                 } else {
                     sb.append("Bye");
                 }
@@ -113,6 +120,7 @@ public class ScheduleService {
         if (status == null) return "❓";
         return switch (status) {
             case Active -> "⏳";
+            case Scheduled -> "📅";
             case Completed -> "✅";
             case Walkover -> "🏁";
             case Cancelled -> "❌";
@@ -120,5 +128,5 @@ public class ScheduleService {
     }
 
     public record PlayerSchedule(Player player, List<TourInfo> tours) {}
-    public record TourInfo(Long tourId, java.time.LocalDateTime startDate, java.time.LocalDateTime endDate, Tour.TourStatus status, Player opponent) {}
+    public record TourInfo(Long tourId, java.time.LocalDateTime startDate, java.time.LocalDateTime endDate, Tour.TourStatus status, Player opponent, java.time.LocalDateTime scheduledTime) {}
 }

@@ -4,6 +4,7 @@ import com.raketo.league.model.Player;
 import com.raketo.league.service.AdminService;
 import com.raketo.league.service.AvailabilityService;
 import com.raketo.league.service.PlayerService;
+import com.raketo.league.service.ScheduleRequestService;
 import com.raketo.league.service.ScheduleService;
 import com.raketo.league.telegram.BotCommand;
 import com.raketo.league.telegram.TelegramBot;
@@ -29,6 +30,7 @@ public class PlayerCommandHandler {
     private final ScheduleService scheduleService;
     private final AdminService adminService;
     private final AvailabilityService availabilityService;
+    private final ScheduleRequestService scheduleRequestService;
     @Value("${app.base-url:http://localhost:8080}")
     private String baseUrl;
     @Value("${app.webapp.enabled:false}")
@@ -55,10 +57,20 @@ public class PlayerCommandHandler {
         Long chatId = update.getCallbackQuery().getMessage().getChatId();
         Long userId = update.getCallbackQuery().getFrom().getId();
         String username = update.getCallbackQuery().getFrom().getUserName();
+
         if ("PLAYER_SCHEDULE_REFRESH".equals(callbackData) || "PLAYER_SCHEDULE".equals(callbackData)) {
             handleSchedule(chatId, userId, username, bot);
         } else if ("PLAYER_HELP".equals(callbackData)) {
             handleHelp(chatId, userId, bot);
+        } else if (callbackData.startsWith("VIEW_REQUESTS_")) {
+            Long tourId = Long.parseLong(callbackData.substring("VIEW_REQUESTS_".length()));
+            handleViewRequests(chatId, userId, username, tourId, bot);
+        } else if (callbackData.startsWith("ACCEPT_REQUEST_")) {
+            Long requestId = Long.parseLong(callbackData.substring("ACCEPT_REQUEST_".length()));
+            handleAcceptRequest(chatId, userId, username, requestId, bot);
+        } else if (callbackData.startsWith("DECLINE_REQUEST_")) {
+            Long requestId = Long.parseLong(callbackData.substring("DECLINE_REQUEST_".length()));
+            handleDeclineRequest(chatId, userId, username, requestId, bot);
         }
     }
 
@@ -127,21 +139,36 @@ public class PlayerCommandHandler {
             int tourNumber = 1;
             for (ScheduleService.TourInfo ti : schedule.tours()) {
                 if (ti.tourId() != null && ti.opponent() != null) {
+                    List<InlineKeyboardButton> row = new ArrayList<>();
+
                     InlineKeyboardButton availabilityBtn = InlineKeyboardButton.builder()
                             .text("Set Availability (Tour " + tourNumber + ")")
                             .webApp(new WebAppInfo(baseUrl + "/webapp/calendar?playerId=" + schedule.player().getTelegramId() + "&tourId=" + ti.tourId()))
                             .build();
-                    keyboard.add(List.of(availabilityBtn));
+                    row.add(availabilityBtn);
+                    keyboard.add(row);
 
                     boolean playerHasAvailability = availabilityService.getPlayerTourAvailability(schedule.player().getId(), ti.tourId()).isPresent();
                     boolean opponentHasAvailability = availabilityService.getPlayerTourAvailability(ti.opponent().getId(), ti.tourId()).isPresent();
 
+                    List<InlineKeyboardButton> actionsRow = new ArrayList<>();
+
                     if (playerHasAvailability && opponentHasAvailability) {
                         InlineKeyboardButton compatibleTimesBtn = InlineKeyboardButton.builder()
-                                .text("Show Compatible Times (Tour " + tourNumber + ")")
+                                .text("Compatible Times (T" + tourNumber + ")")
                                 .webApp(new WebAppInfo(baseUrl + "/webapp/compatible?playerId=" + schedule.player().getId() + "&opponentId=" + ti.opponent().getId() + "&tourId=" + ti.tourId()))
                                 .build();
-                        keyboard.add(List.of(compatibleTimesBtn));
+                        actionsRow.add(compatibleTimesBtn);
+                    }
+
+                    InlineKeyboardButton requestsBtn = InlineKeyboardButton.builder()
+                            .text("View Requests (T" + tourNumber + ")")
+                            .callbackData("VIEW_REQUESTS_" + ti.tourId())
+                            .build();
+                    actionsRow.add(requestsBtn);
+
+                    if (!actionsRow.isEmpty()) {
+                        keyboard.add(actionsRow);
                     }
                 }
                 tourNumber++;
@@ -170,5 +197,89 @@ public class PlayerCommandHandler {
         }
 
         bot.sendMessage(chatId, helpMessage.toString());
+    }
+
+    private void handleViewRequests(Long chatId, Long userId, String username, Long tourId, TelegramBot bot) {
+        Player player = playerService.findOrLinkPlayer(userId, username);
+        if (player == null) {
+            bot.sendMessage(chatId, "You are not registered. Contact admin.");
+            return;
+        }
+
+        List<com.raketo.league.model.ScheduleRequest> requests = scheduleRequestService.getTourRequests(tourId, player.getId());
+        String messageText = scheduleRequestService.formatRequestsMessage(requests, player);
+
+        List<List<InlineKeyboardButton>> keyboard = new ArrayList<>();
+
+        for (com.raketo.league.model.ScheduleRequest req : requests) {
+            if (req.getRecipientPlayer().getId().equals(player.getId()) &&
+                req.getStatus() == com.raketo.league.model.ScheduleRequest.ScheduleStatus.Pending) {
+
+                List<InlineKeyboardButton> row = new ArrayList<>();
+
+                InlineKeyboardButton acceptBtn = InlineKeyboardButton.builder()
+                        .text("✅ Accept #" + req.getId())
+                        .callbackData("ACCEPT_REQUEST_" + req.getId())
+                        .build();
+                row.add(acceptBtn);
+
+                InlineKeyboardButton declineBtn = InlineKeyboardButton.builder()
+                        .text("❌ Decline #" + req.getId())
+                        .callbackData("DECLINE_REQUEST_" + req.getId())
+                        .build();
+                row.add(declineBtn);
+
+                keyboard.add(row);
+            }
+        }
+
+        InlineKeyboardButton backBtn = InlineKeyboardButton.builder()
+                .text("🔙 Back to Schedule")
+                .callbackData("PLAYER_SCHEDULE")
+                .build();
+        keyboard.add(List.of(backBtn));
+
+        org.telegram.telegrambots.meta.api.methods.send.SendMessage message =
+                org.telegram.telegrambots.meta.api.methods.send.SendMessage.builder()
+                .chatId(chatId.toString())
+                .text(messageText)
+                .replyMarkup(InlineKeyboardMarkup.builder().keyboard(keyboard).build())
+                .build();
+
+        try {
+            bot.execute(message);
+        } catch (Exception e) {
+            logger.error("Failed to send requests", e);
+        }
+    }
+
+    private void handleAcceptRequest(Long chatId, Long userId, String username, Long requestId, TelegramBot bot) {
+        Player player = playerService.findOrLinkPlayer(userId, username);
+        if (player == null) {
+            bot.sendMessage(chatId, "You are not registered. Contact admin.");
+            return;
+        }
+
+        try {
+            scheduleRequestService.acceptRequest(requestId, player.getId());
+            bot.sendMessage(chatId, "✅ Request accepted! Match has been scheduled.");
+        } catch (Exception e) {
+            bot.sendMessage(chatId, "❌ Failed to accept request: " + e.getMessage());
+        }
+    }
+
+    private void handleDeclineRequest(Long chatId, Long userId, String username, Long requestId, TelegramBot bot) {
+        Player player = playerService.findOrLinkPlayer(userId, username);
+        if (player == null) {
+            bot.sendMessage(chatId, "You are not registered. Contact admin.");
+            return;
+        }
+
+        try {
+            scheduleRequestService.declineRequest(requestId, player.getId());
+            bot.sendMessage(chatId, "❌ Request declined.");
+        } catch (Exception e) {
+            bot.sendMessage(chatId, "❌ Failed to decline request: " + e.getMessage());
+        }
     }
 }

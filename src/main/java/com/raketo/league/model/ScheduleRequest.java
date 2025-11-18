@@ -20,8 +20,11 @@ public class ScheduleRequest {
     @JoinColumn(name = "tour_id")
     private Tour tour;
 
-    @Column(name = "proposed_time", nullable = false)
-    private LocalDateTime proposedTime;
+    @Column(name = "proposed_date", nullable = false)
+    private java.time.LocalDate proposedDate;
+
+    @Column(name = "proposed_hours", columnDefinition = "TEXT")
+    private String proposedHours;
 
     @ManyToOne(optional = false)
     @JoinColumn(name = "initiator_player_id")
