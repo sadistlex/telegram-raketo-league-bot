@@ -1,6 +1,5 @@
 package com.raketo.league.telegram.handler;
 
-import com.raketo.league.model.AdminUser;
 import com.raketo.league.model.Player;
 import com.raketo.league.service.AdminService;
 import com.raketo.league.service.AvailabilityService;
@@ -140,7 +139,7 @@ public class PlayerCommandHandler {
                     if (playerHasAvailability && opponentHasAvailability) {
                         InlineKeyboardButton compatibleTimesBtn = InlineKeyboardButton.builder()
                                 .text("Show Compatible Times (Tour " + tourNumber + ")")
-                                .webApp(new WebAppInfo(baseUrl + "/webapp/compatible?playerId=" + schedule.player().getTelegramId() + "&opponentId=" + ti.opponent().getTelegramId() + "&tourId=" + ti.tourId()))
+                                .webApp(new WebAppInfo(baseUrl + "/webapp/compatible?playerId=" + schedule.player().getId() + "&opponentId=" + ti.opponent().getId() + "&tourId=" + ti.tourId()))
                                 .build();
                         keyboard.add(List.of(compatibleTimesBtn));
                     }

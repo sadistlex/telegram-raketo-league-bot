@@ -43,9 +43,9 @@ public class WebAppController {
                                    @RequestParam Long opponentId,
                                    @RequestParam Long tourId,
                                    Model model) {
-        Player player = playerService.findByTelegramId(playerId)
+        Player player = playerService.findById(playerId)
                 .orElseThrow(() -> new IllegalArgumentException("Player not found"));
-        Player opponent = playerService.findByTelegramId(opponentId)
+        Player opponent = playerService.findById(opponentId)
                 .orElseThrow(() -> new IllegalArgumentException("Opponent not found"));
         Tour tour = tourRepository.findById(tourId)
                 .orElseThrow(() -> new IllegalArgumentException("Tour not found"));
