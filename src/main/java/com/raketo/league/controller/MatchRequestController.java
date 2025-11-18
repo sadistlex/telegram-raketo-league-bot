@@ -8,6 +8,7 @@ import com.raketo.league.repository.PlayerRepository;
 import com.raketo.league.repository.ScheduleRequestRepository;
 import com.raketo.league.repository.TourRepository;
 import com.raketo.league.telegram.TelegramBot;
+import com.raketo.league.util.FormatUtils;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -28,7 +29,6 @@ public class MatchRequestController {
     private final PlayerRepository playerRepository;
     private final TourRepository tourRepository;
     private final TelegramBot telegramBot;
-    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @PostMapping
     @Transactional
@@ -46,23 +46,19 @@ public class MatchRequestController {
         for (DayRequest dayRequest : payload.getRequests()) {
             LocalDate proposedDate = LocalDate.parse(dayRequest.getDay(), dayFormatter);
 
-            try {
-                String hoursJson = objectMapper.writeValueAsString(dayRequest.getHours());
+            String hoursJson = FormatUtils.hoursToJson(dayRequest.getHours());
 
-                ScheduleRequest scheduleRequest = ScheduleRequest.builder()
-                        .tour(tour)
-                        .initiatorPlayer(initiator)
-                        .recipientPlayer(recipient)
-                        .proposedDate(proposedDate)
-                        .proposedHours(hoursJson)
-                        .status(ScheduleRequest.ScheduleStatus.Pending)
-                        .createdAt(LocalDateTime.now())
-                        .build();
+            ScheduleRequest scheduleRequest = ScheduleRequest.builder()
+                    .tour(tour)
+                    .initiatorPlayer(initiator)
+                    .recipientPlayer(recipient)
+                    .proposedDate(proposedDate)
+                    .proposedHours(hoursJson)
+                    .status(ScheduleRequest.ScheduleStatus.Pending)
+                    .createdAt(LocalDateTime.now())
+                    .build();
 
-                createdRequests.add(scheduleRequestRepository.save(scheduleRequest));
-            } catch (Exception e) {
-                throw new RuntimeException("Failed to serialize hours", e);
-            }
+            createdRequests.add(scheduleRequestRepository.save(scheduleRequest));
         }
 
         sendNotifications(initiator, recipient, tour, createdRequests);
@@ -71,21 +67,18 @@ public class MatchRequestController {
     }
 
     private void sendNotifications(Player initiator, Player recipient, Tour tour, List<ScheduleRequest> requests) {
-        DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy");
-
         if (initiator.getTelegramId() != null) {
             StringBuilder initiatorMsg = new StringBuilder();
             initiatorMsg.append("✅ Match request sent to ").append(recipient.getName()).append("\n\n");
             initiatorMsg.append("Tour: ").append(tour.getId()).append("\n");
             initiatorMsg.append("Proposed times:\n");
             for (ScheduleRequest req : requests) {
-                initiatorMsg.append("📅 ").append(req.getProposedDate().format(dateFormatter));
-                try {
-                    List<Integer> hours = objectMapper.readValue(req.getProposedHours(), List.class);
-                    initiatorMsg.append(" (").append(formatHours(hours)).append(")\n");
-                } catch (Exception e) {
-                    initiatorMsg.append("\n");
+                initiatorMsg.append("📅 ").append(FormatUtils.formatDate(req.getProposedDate()));
+                List<Integer> hours = FormatUtils.parseHoursFromJson(req.getProposedHours());
+                if (!hours.isEmpty()) {
+                    initiatorMsg.append(" (").append(FormatUtils.formatHours(hours)).append(")");
                 }
+                initiatorMsg.append("\n");
             }
 
             telegramBot.sendMessage(initiator.getTelegramId(), initiatorMsg.toString());
@@ -97,13 +90,12 @@ public class MatchRequestController {
             recipientMsg.append("Tour: ").append(tour.getId()).append("\n");
             recipientMsg.append("Proposed times:\n");
             for (ScheduleRequest req : requests) {
-                recipientMsg.append("📅 ").append(req.getProposedDate().format(dateFormatter));
-                try {
-                    List<Integer> hours = objectMapper.readValue(req.getProposedHours(), List.class);
-                    recipientMsg.append(" (").append(formatHours(hours)).append(")\n");
-                } catch (Exception e) {
-                    recipientMsg.append("\n");
+                recipientMsg.append("📅 ").append(FormatUtils.formatDate(req.getProposedDate()));
+                List<Integer> hours = FormatUtils.parseHoursFromJson(req.getProposedHours());
+                if (!hours.isEmpty()) {
+                    recipientMsg.append(" (").append(FormatUtils.formatHours(hours)).append(")");
                 }
+                recipientMsg.append("\n");
             }
             recipientMsg.append("\nUse /schedule to view and respond to requests.");
 
@@ -111,11 +103,6 @@ public class MatchRequestController {
         }
     }
 
-    private String formatHours(List<Integer> hours) {
-        if (hours.isEmpty()) return "";
-        if (hours.size() == 1) return String.format("%02d:00", hours.get(0));
-        return String.format("%02d:00-%02d:00", hours.get(0), hours.get(hours.size() - 1));
-    }
 
     @Data
     public static class MatchRequestPayload {

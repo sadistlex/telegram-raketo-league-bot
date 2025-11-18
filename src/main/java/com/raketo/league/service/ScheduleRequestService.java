@@ -1,17 +1,16 @@
 package com.raketo.league.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.raketo.league.model.Player;
 import com.raketo.league.model.ScheduleRequest;
 import com.raketo.league.model.Tour;
 import com.raketo.league.repository.ScheduleRequestRepository;
 import com.raketo.league.repository.TourRepository;
+import com.raketo.league.util.FormatUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.function.BiConsumer;
 
@@ -20,7 +19,6 @@ import java.util.function.BiConsumer;
 public class ScheduleRequestService {
     private final ScheduleRequestRepository scheduleRequestRepository;
     private final TourRepository tourRepository;
-    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Transactional(readOnly = true)
     public List<ScheduleRequest> getPlayerRequests(Long playerId) {
@@ -52,13 +50,10 @@ public class ScheduleRequestService {
 
         Tour tour = request.getTour();
 
-        try {
-            List<Integer> hours = objectMapper.readValue(request.getProposedHours(), List.class);
-            if (!hours.isEmpty()) {
-                LocalDateTime scheduledTime = request.getProposedDate().atTime(hours.get(0), 0);
-                tour.setScheduledTime(scheduledTime);
-            }
-        } catch (Exception e) {
+        List<Integer> hours = FormatUtils.parseHoursFromJson(request.getProposedHours());
+        if (!hours.isEmpty()) {
+            LocalDateTime scheduledTime = request.getProposedDate().atTime(hours.get(0), 0);
+            tour.setScheduledTime(scheduledTime);
         }
 
         tour.setStatus(Tour.TourStatus.Scheduled);
@@ -95,40 +90,28 @@ public class ScheduleRequestService {
     }
 
     private String buildAcceptanceNotification(ScheduleRequest request) {
-        DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy");
-
         StringBuilder msg = new StringBuilder();
         msg.append("✅ Your match request was accepted!\n\n");
         msg.append("Opponent: ").append(request.getRecipientPlayer().getName()).append("\n");
-        msg.append("Date: ").append(request.getProposedDate().format(dateFormatter)).append("\n");
+        msg.append("Date: ").append(FormatUtils.formatDate(request.getProposedDate())).append("\n");
 
-        try {
-            List<Integer> hours = objectMapper.readValue(request.getProposedHours(), List.class);
-            if (!hours.isEmpty()) {
-                msg.append("Time: ").append(formatHours(hours)).append("\n");
-            }
-        } catch (Exception e) {
+        List<Integer> hours = FormatUtils.parseHoursFromJson(request.getProposedHours());
+        if (!hours.isEmpty()) {
+            msg.append("Time: ").append(FormatUtils.formatHours(hours)).append("\n");
         }
 
         return msg.toString();
     }
 
     private String buildDeclineNotification(ScheduleRequest request) {
-        DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy");
-
         StringBuilder msg = new StringBuilder();
         msg.append("❌ Your match request was declined.\n\n");
         msg.append("Opponent: ").append(request.getRecipientPlayer().getName()).append("\n");
-        msg.append("Date: ").append(request.getProposedDate().format(dateFormatter)).append("\n");
+        msg.append("Date: ").append(FormatUtils.formatDate(request.getProposedDate())).append("\n");
 
         return msg.toString();
     }
 
-    private String formatHours(List<Integer> hours) {
-        if (hours.isEmpty()) return "";
-        if (hours.size() == 1) return String.format("%02d:00", hours.get(0));
-        return String.format("%02d:00-%02d:00", hours.get(0), hours.get(hours.size() - 1));
-    }
 
     public String formatRequestsMessage(List<ScheduleRequest> requests, Player currentPlayer) {
         if (requests.isEmpty()) {
@@ -136,7 +119,6 @@ public class ScheduleRequestService {
         }
 
         StringBuilder sb = new StringBuilder();
-        DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy");
 
         List<ScheduleRequest> incoming = requests.stream()
                 .filter(r -> r.getRecipientPlayer().getId().equals(currentPlayer.getId()))
@@ -149,11 +131,10 @@ public class ScheduleRequestService {
             sb.append("📥 Incoming Requests:\n\n");
             for (ScheduleRequest req : incoming) {
                 sb.append("From: ").append(req.getInitiatorPlayer().getName()).append("\n");
-                sb.append("Date: ").append(req.getProposedDate().format(dateFormatter)).append("\n");
-                try {
-                    List<Integer> hours = objectMapper.readValue(req.getProposedHours(), List.class);
-                    sb.append("Time: ").append(formatHours(hours)).append("\n");
-                } catch (Exception e) {
+                sb.append("Date: ").append(FormatUtils.formatDate(req.getProposedDate())).append("\n");
+                List<Integer> hours = FormatUtils.parseHoursFromJson(req.getProposedHours());
+                if (!hours.isEmpty()) {
+                    sb.append("Time: ").append(FormatUtils.formatHours(hours)).append("\n");
                 }
                 sb.append("Status: ").append(getStatusEmoji(req.getStatus())).append(" ").append(req.getStatus()).append("\n");
                 sb.append("ID: ").append(req.getId()).append("\n\n");
@@ -164,11 +145,10 @@ public class ScheduleRequestService {
             sb.append("📤 Outgoing Requests:\n\n");
             for (ScheduleRequest req : outgoing) {
                 sb.append("To: ").append(req.getRecipientPlayer().getName()).append("\n");
-                sb.append("Date: ").append(req.getProposedDate().format(dateFormatter)).append("\n");
-                try {
-                    List<Integer> hours = objectMapper.readValue(req.getProposedHours(), List.class);
-                    sb.append("Time: ").append(formatHours(hours)).append("\n");
-                } catch (Exception e) {
+                sb.append("Date: ").append(FormatUtils.formatDate(req.getProposedDate())).append("\n");
+                List<Integer> hours = FormatUtils.parseHoursFromJson(req.getProposedHours());
+                if (!hours.isEmpty()) {
+                    sb.append("Time: ").append(FormatUtils.formatHours(hours)).append("\n");
                 }
                 sb.append("Status: ").append(getStatusEmoji(req.getStatus())).append(" ").append(req.getStatus()).append("\n\n");
             }
