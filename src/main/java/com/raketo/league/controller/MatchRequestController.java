@@ -73,38 +73,42 @@ public class MatchRequestController {
     private void sendNotifications(Player initiator, Player recipient, Tour tour, List<ScheduleRequest> requests) {
         DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy");
 
-        StringBuilder initiatorMsg = new StringBuilder();
-        initiatorMsg.append("✅ Match request sent to ").append(recipient.getName()).append("\n\n");
-        initiatorMsg.append("Tour: ").append(tour.getId()).append("\n");
-        initiatorMsg.append("Proposed times:\n");
-        for (ScheduleRequest req : requests) {
-            initiatorMsg.append("📅 ").append(req.getProposedDate().format(dateFormatter));
-            try {
-                List<Integer> hours = objectMapper.readValue(req.getProposedHours(), List.class);
-                initiatorMsg.append(" (").append(formatHours(hours)).append(")\n");
-            } catch (Exception e) {
-                initiatorMsg.append("\n");
+        if (initiator.getTelegramId() != null) {
+            StringBuilder initiatorMsg = new StringBuilder();
+            initiatorMsg.append("✅ Match request sent to ").append(recipient.getName()).append("\n\n");
+            initiatorMsg.append("Tour: ").append(tour.getId()).append("\n");
+            initiatorMsg.append("Proposed times:\n");
+            for (ScheduleRequest req : requests) {
+                initiatorMsg.append("📅 ").append(req.getProposedDate().format(dateFormatter));
+                try {
+                    List<Integer> hours = objectMapper.readValue(req.getProposedHours(), List.class);
+                    initiatorMsg.append(" (").append(formatHours(hours)).append(")\n");
+                } catch (Exception e) {
+                    initiatorMsg.append("\n");
+                }
             }
+
+            telegramBot.sendMessage(initiator.getTelegramId(), initiatorMsg.toString());
         }
 
-        telegramBot.sendMessage(initiator.getTelegramId(), initiatorMsg.toString());
-
-        StringBuilder recipientMsg = new StringBuilder();
-        recipientMsg.append("🎾 New match request from ").append(initiator.getName()).append("\n\n");
-        recipientMsg.append("Tour: ").append(tour.getId()).append("\n");
-        recipientMsg.append("Proposed times:\n");
-        for (ScheduleRequest req : requests) {
-            recipientMsg.append("📅 ").append(req.getProposedDate().format(dateFormatter));
-            try {
-                List<Integer> hours = objectMapper.readValue(req.getProposedHours(), List.class);
-                recipientMsg.append(" (").append(formatHours(hours)).append(")\n");
-            } catch (Exception e) {
-                recipientMsg.append("\n");
+        if (recipient.getTelegramId() != null) {
+            StringBuilder recipientMsg = new StringBuilder();
+            recipientMsg.append("🎾 New match request from ").append(initiator.getName()).append("\n\n");
+            recipientMsg.append("Tour: ").append(tour.getId()).append("\n");
+            recipientMsg.append("Proposed times:\n");
+            for (ScheduleRequest req : requests) {
+                recipientMsg.append("📅 ").append(req.getProposedDate().format(dateFormatter));
+                try {
+                    List<Integer> hours = objectMapper.readValue(req.getProposedHours(), List.class);
+                    recipientMsg.append(" (").append(formatHours(hours)).append(")\n");
+                } catch (Exception e) {
+                    recipientMsg.append("\n");
+                }
             }
-        }
-        recipientMsg.append("\nUse /schedule to view and respond to requests.");
+            recipientMsg.append("\nUse /schedule to view and respond to requests.");
 
-        telegramBot.sendMessage(recipient.getTelegramId(), recipientMsg.toString());
+            telegramBot.sendMessage(recipient.getTelegramId(), recipientMsg.toString());
+        }
     }
 
     private String formatHours(List<Integer> hours) {
