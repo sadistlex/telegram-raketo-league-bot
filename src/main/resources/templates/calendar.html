@@ -248,6 +248,12 @@
         const tourStartDate = /*[[${tourStartDate}]]*/ null;
         const tourEndDate = /*[[${tourEndDate}]]*/ null;
 
+        const MSG_TOGGLE_HIDE = /*[[#{web.calendar.toggle.hide}]]*/ 'Hide 00:00-07:00';
+        const MSG_TOGGLE_SHOW = /*[[#{web.calendar.toggle.show}]]*/ 'Show 00:00-07:00';
+        const MSG_ALERT_MISSING = /*[[#{web.calendar.alert.missing}]]*/ 'Missing player or tour';
+        const MSG_ALERT_SAVE_FAILED = /*[[#{web.calendar.alert.save.failed}]]*/ 'Save failed';
+        const MSG_ALERT_ERROR = /*[[#{web.calendar.alert.error}]]*/ 'Error';
+
         console.log('Calendar initialized with:', { playerId, tourId, tourStartDate, tourEndDate });
 
         if (!playerId || !tourId || !tourStartDate || !tourEndDate) {
@@ -568,7 +574,7 @@
 
         document.getElementById('save-button').addEventListener('click', async () => {
             if (!playerId || !tourId) {
-                tg.showAlert([[#{web.calendar.alert.missing}]]);
+                tg.showAlert(MSG_ALERT_MISSING);
                 return;
             }
 
