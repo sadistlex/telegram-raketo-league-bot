@@ -248,6 +248,15 @@
         const tourStartDate = /*[[${tourStartDate}]]*/ null;
         const tourEndDate = /*[[${tourEndDate}]]*/ null;
 
+        console.log('Calendar initialized with:', { playerId, tourId, tourStartDate, tourEndDate });
+
+        if (!playerId || !tourId || !tourStartDate || !tourEndDate) {
+            console.error('Missing required parameters!');
+            tg.showAlert('Error: Missing required parameters. Please try again.');
+            document.getElementById('week-display').textContent = 'Error: Missing data';
+            return;
+        }
+
         let currentMode = 'green';
         let slots = {};
         let currentWeekStart = new Date();
@@ -513,7 +522,10 @@
         }
 
         async function loadExisting(){
-            if (!playerId || !tourId) return;
+            if (!playerId || !tourId) {
+                console.warn('Missing playerId or tourId');
+                return false;
+            }
 
             try {
                 const res = await fetch(`/api/availability/tour/${tourId}/player/${playerId}`);
@@ -604,9 +616,15 @@
 
         setMode('green');
         loadExisting().then((hasData) => {
+            console.log('Load existing completed, hasData:', hasData);
             if (!hasData) {
+                console.log('No existing data, setting preset times');
                 setPresetTimes();
             }
+            renderCalendar();
+        }).catch((err) => {
+            console.error('Error during initialization:', err);
+            setPresetTimes();
             renderCalendar();
         });
     </script>

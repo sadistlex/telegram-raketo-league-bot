@@ -467,7 +467,10 @@
         }
 
         async function loadCompatibility(){
-            if (!playerId || !opponentId || !tourId) return;
+            if (!playerId || !opponentId || !tourId) {
+                console.warn('Missing playerId, opponentId, or tourId');
+                return;
+            }
 
             try {
                 const res = await fetch(`/api/availability/compatible/${tourId}/${playerId}/${opponentId}`);
@@ -475,9 +478,13 @@
                     const data = await res.json();
                     processCompatibilityData(data);
                     renderCalendar();
+                } else {
+                    console.error('Failed to load compatibility data:', res.status);
+                    renderCalendar();
                 }
             } catch (e) {
                 console.error('load error', e);
+                renderCalendar();
             }
         }
 
