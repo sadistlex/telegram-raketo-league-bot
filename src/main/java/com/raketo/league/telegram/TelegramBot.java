@@ -73,7 +73,13 @@ public class TelegramBot extends TelegramLongPollingBot {
     }
 
     private boolean isAdminCallback(String callbackData) {
-        return callbackData != null && (callbackData.startsWith("ADMIN_") || callbackData.equals("ADMIN_MENU"));
+        if (callbackData == null) {
+            return false;
+        }
+        if (callbackData.startsWith("ADMIN_")) {
+            return true;
+        }
+        return callbackData.equals("ADMIN_MENU");
     }
 
     public void sendMessage(Long chatId, String text) {
@@ -93,4 +99,3 @@ public class TelegramBot extends TelegramLongPollingBot {
         return botUsername;
     }
 }
-

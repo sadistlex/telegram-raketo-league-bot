@@ -1,5 +1,6 @@
 package com.raketo.league.service;
 
+import com.raketo.league.model.Language;
 import com.raketo.league.model.Player;
 import com.raketo.league.repository.PlayerRepository;
 import lombok.RequiredArgsConstructor;
@@ -35,7 +36,9 @@ public class PlayerService {
     @Transactional
     public Player findOrLinkPlayer(Long telegramId, String telegramUsername) {
         Optional<Player> byId = findByTelegramId(telegramId);
-        if (byId.isPresent()) return byId.get();
+        if (byId.isPresent()) {
+            return byId.get();
+        }
         Optional<Player> byUsername = findByTelegramUsername(telegramUsername);
         if (byUsername.isPresent()) {
             Player player = byUsername.get();
@@ -56,6 +59,7 @@ public class PlayerService {
                 .telegramUsername(username)
                 .name(name)
                 .isActive(true)
+                .language(Language.RU)
                 .build();
         return playerRepository.save(player);
     }
@@ -68,5 +72,11 @@ public class PlayerService {
     @Transactional(readOnly = true)
     public List<Player> getAllPlayers() {
         return playerRepository.findAll();
+    }
+
+    @Transactional
+    public void updateLanguage(Player player, Language language) {
+        player.setLanguage(language);
+        playerRepository.save(player);
     }
 }

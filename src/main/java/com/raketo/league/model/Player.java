@@ -26,4 +26,9 @@ public class Player {
 
     @Column(name = "telegram_username", nullable = false, unique = true)
     private String telegramUsername;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "language", nullable = false)
+    @Builder.Default
+    private Language language = Language.RU;
 }

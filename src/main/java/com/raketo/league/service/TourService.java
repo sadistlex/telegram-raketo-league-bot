@@ -8,15 +8,15 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class TourService {
-
     private static final Logger logger = LoggerFactory.getLogger(TourService.class);
-
     private final TourTemplateRepository tourTemplateRepository;
     private final TourRepository tourRepository;
     private final TourPlayerRepository tourPlayerRepository;
@@ -27,312 +27,244 @@ public class TourService {
 
     @Transactional
     public int generateRoundRobinTours(Long divisionTournamentId, LocalDateTime tournamentStartDate, int tourDurationDays) {
-        logger.info("Generating round-robin tours for divisionTournamentId: {}, startDate: {}, durationDays: {}",
-                divisionTournamentId, tournamentStartDate, tourDurationDays);
-
-        DivisionTournament divisionTournament = divisionTournamentRepository.findById(divisionTournamentId)
-                .orElseThrow(() -> new IllegalArgumentException("DivisionTournament not found with id: " + divisionTournamentId));
-
-        List<PlayerDivisionAssignment> playerAssignments = playerDivisionAssignmentRepository.findByDivisionTournamentId(divisionTournamentId);
-        if (playerAssignments.size() < 2) {
-            throw new IllegalArgumentException("Need at least 2 players to generate tours");
-        }
-
-        List<Player> players = playerAssignments.stream()
-                .map(PlayerDivisionAssignment::getPlayer)
-                .toList();
-
-        int numberOfTours = players.size() % 2 == 0 ? players.size() - 1 : players.size();
-
-        List<TourTemplate> existingTemplates = tourTemplateRepository.findByDivisionTournamentId(divisionTournamentId);
-        if (!existingTemplates.isEmpty()) {
-            logger.warn("Tour templates already exist for divisionTournamentId: {}. Deleting existing templates and tours.", divisionTournamentId);
-            List<Tour> existingTours = existingTemplates.stream()
-                    .flatMap(template -> tourRepository.findByTourTemplateId(template.getId()).stream())
-                    .toList();
-            for (Tour tour : existingTours) {
-                tourPlayerRepository.deleteAll(tourPlayerRepository.findByTourId(tour.getId()));
-            }
-            tourRepository.deleteAll(existingTours);
-            tourTemplateRepository.deleteAll(existingTemplates);
-        }
-
-        List<TourTemplate> tourTemplates = new ArrayList<>();
-        LocalDateTime currentStartDate = tournamentStartDate;
-
-        for (int i = 0; i < numberOfTours; i++) {
-            LocalDateTime endDate = currentStartDate.plusDays(tourDurationDays);
-
-            TourTemplate template = TourTemplate.builder()
-                    .divisionTournament(divisionTournament)
-                    .startDate(currentStartDate)
-                    .endDate(endDate)
-                    .build();
-
-            tourTemplates.add(template);
-            currentStartDate = endDate;
-        }
-
-        tourTemplateRepository.saveAll(tourTemplates);
-
-        List<List<PlayerPair>> roundRobinSchedule = generateRoundRobinSchedule(players);
-
-        if (roundRobinSchedule.size() != tourTemplates.size()) {
-            throw new IllegalStateException("Mismatch between tour templates count and generated rounds. Templates: " +
-                    tourTemplates.size() + ", Rounds: " + roundRobinSchedule.size());
-        }
-
-        int totalToursCreated = 0;
-        for (int i = 0; i < roundRobinSchedule.size(); i++) {
-            TourTemplate template = tourTemplates.get(i);
-            List<PlayerPair> pairs = roundRobinSchedule.get(i);
-
-            for (PlayerPair pair : pairs) {
-                Tour tour = Tour.builder()
-                        .tourTemplate(template)
-                        .status(Tour.TourStatus.Active)
-                        .updatedAt(LocalDateTime.now())
-                        .build();
-
-                Tour savedTour = tourRepository.save(tour);
-
-                TourPlayer tourPlayer1 = TourPlayer.builder()
-                        .tour(savedTour)
-                        .player(pair.player1)
-                        .build();
-
-                TourPlayer tourPlayer2 = TourPlayer.builder()
-                        .tour(savedTour)
-                        .player(pair.player2)
-                        .build();
-
-                tourPlayerRepository.save(tourPlayer1);
-                tourPlayerRepository.save(tourPlayer2);
-                totalToursCreated++;
-            }
-        }
-
-        logger.info("Generated {} tour templates and {} tour pairings for divisionTournamentId: {}",
-                numberOfTours, totalToursCreated, divisionTournamentId);
-
-        return totalToursCreated;
+        logger.info("Generating round-robin tours divisionTournamentId={}, startDate={}, durationDays={}", divisionTournamentId, tournamentStartDate, tourDurationDays);
+        return createOrRecreateRoundRobin(divisionTournamentId, tournamentStartDate, tourDurationDays, false);
     }
 
     @Transactional
     public int regenerateRoundRobinTours(Long divisionTournamentId) {
-        logger.info("Regenerating round-robin tours for divisionTournamentId: {}", divisionTournamentId);
+        logger.info("Regenerating round-robin tours divisionTournamentId={}", divisionTournamentId);
+        return createOrRecreateRoundRobin(divisionTournamentId, null, null, true);
+    }
 
-        DivisionTournament divisionTournament = divisionTournamentRepository.findById(divisionTournamentId)
-                .orElseThrow(() -> new IllegalArgumentException("DivisionTournament not found with id: " + divisionTournamentId));
-
+    private int createOrRecreateRoundRobin(Long divisionTournamentId, LocalDateTime startDateArg, Integer tourDurationDaysArg, boolean preserveAvailability) {
+        DivisionTournament divisionTournament = loadTournament(divisionTournamentId);
+        List<Player> players = loadPlayers(divisionTournamentId);
+        int numberOfTours = computeNumberOfTours(players.size());
         List<TourTemplate> existingTemplates = tourTemplateRepository.findByDivisionTournamentId(divisionTournamentId);
+        GenerationParams params = prepareGenerationParams(preserveAvailability, existingTemplates, startDateArg, tourDurationDaysArg, divisionTournamentId);
+        if (!existingTemplates.isEmpty()) {
+            deleteExistingCascade(existingTemplates, params.oldTours);
+        }
+        List<TourTemplate> newTemplates = buildTemplates(divisionTournament, params.startDate, params.durationDays, numberOfTours);
+        List<List<PlayerPair>> schedule = generateRoundRobinSchedule(players);
+        if (schedule.size() != newTemplates.size()) {
+            throw new IllegalStateException("Mismatch templates=" + newTemplates.size() + " rounds=" + schedule.size());
+        }
+        Map<String, Long> tourIdByKey = persistTours(newTemplates, schedule);
+        int preserved = 0;
+        if (preserveAvailability) {
+            preserved = preserveAvailability(params.oldAvailabilities, params.oldTours, newTemplates, schedule, tourIdByKey, players);
+        }
+        logger.info("Round-robin created templates={} tours={} divisionTournamentId={} preservedAvailability={}", numberOfTours, tourIdByKey.size(), divisionTournamentId, preserved);
+        return tourIdByKey.size();
+    }
+
+    private GenerationParams prepareGenerationParams(boolean preserveAvailability, List<TourTemplate> existingTemplates, LocalDateTime startDateArg, Integer tourDurationDaysArg, Long divisionTournamentId) {
+        if (preserveAvailability) {
+            return preparePreserveParams(existingTemplates);
+        }
+        return prepareNewParams(existingTemplates, startDateArg, tourDurationDaysArg, divisionTournamentId);
+    }
+
+    private GenerationParams preparePreserveParams(List<TourTemplate> existingTemplates) {
         if (existingTemplates.isEmpty()) {
-            throw new IllegalArgumentException("No existing tour templates found. Use /gentours to generate tours first.");
+            throw new IllegalArgumentException("No existing tour templates found. Use /gentours first.");
         }
+        LocalDateTime startDate = existingTemplates.get(0).getStartDate();
+        int durationDays = (int) Duration.between(existingTemplates.get(0).getStartDate(), existingTemplates.get(0).getEndDate()).toDays();
+        List<Tour> oldTours = collectOldTours(existingTemplates);
+        Map<Long, List<AvailabilitySlot>> oldAvailabilities = collectOldAvailability(oldTours);
+        return new GenerationParams(startDate, durationDays, oldAvailabilities, oldTours);
+    }
 
-        LocalDateTime tournamentStartDate = existingTemplates.get(0).getStartDate();
-        long tourDurationDays = java.time.Duration.between(
-                existingTemplates.get(0).getStartDate(),
-                existingTemplates.get(0).getEndDate()
-        ).toDays();
-
-        List<PlayerDivisionAssignment> playerAssignments = playerDivisionAssignmentRepository.findByDivisionTournamentId(divisionTournamentId);
-        if (playerAssignments.size() < 2) {
-            throw new IllegalArgumentException("Need at least 2 players to generate tours");
+    private GenerationParams prepareNewParams(List<TourTemplate> existingTemplates, LocalDateTime startDateArg, Integer tourDurationDaysArg, Long divisionTournamentId) {
+        if (startDateArg == null) {
+            throw new IllegalArgumentException("Start date is required");
         }
+        if (tourDurationDaysArg == null || tourDurationDaysArg <= 0) {
+            throw new IllegalArgumentException("tourDurationDays must be > 0");
+        }
+        if (!existingTemplates.isEmpty()) {
+            logger.warn("Existing templates found divisionTournamentId={}, deleting before creation", divisionTournamentId);
+        }
+        List<Tour> oldTours = collectOldTours(existingTemplates);
+        return new GenerationParams(startDateArg, tourDurationDaysArg, Collections.emptyMap(), oldTours);
+    }
 
-        List<Player> players = playerAssignments.stream()
-                .map(PlayerDivisionAssignment::getPlayer)
-                .toList();
+    private List<Tour> collectOldTours(List<TourTemplate> templates) {
+        if (templates.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return templates.stream().flatMap(t -> tourRepository.findByTourTemplateId(t.getId()).stream()).toList();
+    }
 
-        int numberOfTours = players.size() % 2 == 0 ? players.size() - 1 : players.size();
-
-        Map<Long, List<AvailabilitySlot>> oldAvailabilitiesByTourId = new HashMap<>();
-        List<Tour> existingTours = existingTemplates.stream()
-                .flatMap(template -> tourRepository.findByTourTemplateId(template.getId()).stream())
-                .toList();
-
-        for (Tour tour : existingTours) {
-            List<AvailabilitySlot> availabilities = availabilitySlotRepository.findByTourId(tour.getId());
-            if (!availabilities.isEmpty()) {
-                oldAvailabilitiesByTourId.put(tour.getId(), availabilities);
+    private Map<Long, List<AvailabilitySlot>> collectOldAvailability(List<Tour> oldTours) {
+        Map<Long, List<AvailabilitySlot>> map = new HashMap<>();
+        for (Tour tour : oldTours) {
+            List<AvailabilitySlot> slots = availabilitySlotRepository.findByTourId(tour.getId());
+            if (!slots.isEmpty()) {
+                map.put(tour.getId(), slots);
             }
         }
+        return map;
+    }
 
-        for (Tour tour : existingTours) {
+    private DivisionTournament loadTournament(Long id) {
+        return divisionTournamentRepository.findById(id).orElseThrow(() -> new IllegalArgumentException("DivisionTournament not found id=" + id));
+    }
+
+    private List<Player> loadPlayers(Long divisionTournamentId) {
+        List<PlayerDivisionAssignment> assignments = playerDivisionAssignmentRepository.findByDivisionTournamentId(divisionTournamentId);
+        if (assignments.size() < 2) {
+            throw new IllegalArgumentException("Need at least 2 players to generate tours");
+        }
+        return assignments.stream().map(PlayerDivisionAssignment::getPlayer).toList();
+    }
+
+    private int computeNumberOfTours(int playerCount) {
+        return playerCount % 2 == 0 ? playerCount - 1 : playerCount;
+    }
+
+    private void deleteExistingCascade(List<TourTemplate> templates, List<Tour> tours) {
+        for (Tour tour : tours) {
             scheduleRequestRepository.deleteAll(scheduleRequestRepository.findByTourId(tour.getId()));
             tourPlayerRepository.deleteAll(tourPlayerRepository.findByTourId(tour.getId()));
         }
-        tourRepository.deleteAll(existingTours);
-        tourTemplateRepository.deleteAll(existingTemplates);
+        tourRepository.deleteAll(tours);
+        tourTemplateRepository.deleteAll(templates);
+    }
 
-        List<TourTemplate> tourTemplates = new ArrayList<>();
-        LocalDateTime currentStartDate = tournamentStartDate;
-
-        for (int i = 0; i < numberOfTours; i++) {
-            LocalDateTime endDate = currentStartDate.plusDays(tourDurationDays);
-
-            TourTemplate template = TourTemplate.builder()
-                    .divisionTournament(divisionTournament)
-                    .startDate(currentStartDate)
-                    .endDate(endDate)
-                    .build();
-
-            tourTemplates.add(template);
-            currentStartDate = endDate;
+    private List<TourTemplate> buildTemplates(DivisionTournament divisionTournament, LocalDateTime startDate, int durationDays, int count) {
+        List<TourTemplate> list = new ArrayList<>();
+        LocalDateTime current = startDate;
+        for (int i = 0; i < count; i++) {
+            LocalDateTime end = current.plusDays(durationDays);
+            TourTemplate template = TourTemplate.builder().divisionTournament(divisionTournament).startDate(current).endDate(end).build();
+            list.add(template);
+            current = end;
         }
+        tourTemplateRepository.saveAll(list);
+        return list;
+    }
 
-        tourTemplateRepository.saveAll(tourTemplates);
-
-        List<List<PlayerPair>> roundRobinSchedule = generateRoundRobinSchedule(players);
-
-        if (roundRobinSchedule.size() != tourTemplates.size()) {
-            throw new IllegalStateException("Mismatch between tour templates count and generated rounds. Templates: " +
-                    tourTemplates.size() + ", Rounds: " + roundRobinSchedule.size());
-        }
-
-        Map<String, Long> newTourIdByTemplateAndPlayers = new HashMap<>();
-        int totalToursCreated = 0;
-
-        for (int i = 0; i < roundRobinSchedule.size(); i++) {
-            TourTemplate template = tourTemplates.get(i);
-            List<PlayerPair> pairs = roundRobinSchedule.get(i);
-
-            for (PlayerPair pair : pairs) {
-                Tour tour = Tour.builder()
-                        .tourTemplate(template)
-                        .status(Tour.TourStatus.Active)
-                        .updatedAt(LocalDateTime.now())
-                        .build();
-
-                Tour savedTour = tourRepository.save(tour);
-
-                TourPlayer tourPlayer1 = TourPlayer.builder()
-                        .tour(savedTour)
-                        .player(pair.player1)
-                        .build();
-
-                TourPlayer tourPlayer2 = TourPlayer.builder()
-                        .tour(savedTour)
-                        .player(pair.player2)
-                        .build();
-
-                tourPlayerRepository.save(tourPlayer1);
-                tourPlayerRepository.save(tourPlayer2);
-
-                String key = template.getId() + "_" + pair.player1.getId() + "_" + pair.player2.getId();
-                newTourIdByTemplateAndPlayers.put(key, savedTour.getId());
-
-                totalToursCreated++;
+    private Map<String, Long> persistTours(List<TourTemplate> templates, List<List<PlayerPair>> schedule) {
+        Map<String, Long> map = new HashMap<>();
+        for (int i = 0; i < schedule.size(); i++) {
+            TourTemplate template = templates.get(i);
+            for (PlayerPair pair : schedule.get(i)) {
+                Tour tour = Tour.builder().tourTemplate(template).status(Tour.TourStatus.Active).updatedAt(LocalDateTime.now()).build();
+                Tour saved = tourRepository.save(tour);
+                tourPlayerRepository.save(TourPlayer.builder().tour(saved).player(pair.player1).build());
+                tourPlayerRepository.save(TourPlayer.builder().tour(saved).player(pair.player2).build());
+                map.put(buildKey(template.getId(), pair.player1.getId(), pair.player2.getId()), saved.getId());
             }
         }
+        return map;
+    }
 
-        int availabilitiesPreserved = 0;
-        for (Map.Entry<Long, List<AvailabilitySlot>> entry : oldAvailabilitiesByTourId.entrySet()) {
-            Long oldTourId = entry.getKey();
-            List<AvailabilitySlot> oldSlots = entry.getValue();
-
-            Tour oldTour = existingTours.stream()
-                    .filter(t -> t.getId().equals(oldTourId))
-                    .findFirst()
-                    .orElse(null);
-
-            if (oldTour == null) continue;
-
+    private int preserveAvailability(Map<Long, List<AvailabilitySlot>> oldAvailabilities, List<Tour> oldTours, List<TourTemplate> newTemplates, List<List<PlayerPair>> schedule, Map<String, Long> tourIdByKey, List<Player> newPlayers) {
+        if (oldAvailabilities.isEmpty()) {
+            return 0;
+        }
+        Set<Long> newPlayerIds = newPlayers.stream().map(Player::getId).collect(Collectors.toSet());
+        Map<String, Integer> templateIndexByDateRange = new HashMap<>();
+        for (int i = 0; i < newTemplates.size(); i++) {
+            TourTemplate t = newTemplates.get(i);
+            templateIndexByDateRange.put(t.getStartDate() + "_" + t.getEndDate(), i);
+        }
+        Map<Long, Tour> oldTourById = oldTours.stream().collect(Collectors.toMap(Tour::getId, t -> t));
+        int preserved = 0;
+        for (Map.Entry<Long, List<AvailabilitySlot>> entry : oldAvailabilities.entrySet()) {
+            Tour oldTour = oldTourById.get(entry.getKey());
+            if (oldTour == null) {
+                continue;
+            }
             TourTemplate oldTemplate = oldTour.getTourTemplate();
-
-            int templateIndex = -1;
-            for (int i = 0; i < tourTemplates.size(); i++) {
-                TourTemplate newTemplate = tourTemplates.get(i);
-                if (newTemplate.getStartDate().equals(oldTemplate.getStartDate()) &&
-                    newTemplate.getEndDate().equals(oldTemplate.getEndDate())) {
-                    templateIndex = i;
-                    break;
+            Integer index = templateIndexByDateRange.get(oldTemplate.getStartDate() + "_" + oldTemplate.getEndDate());
+            if (index == null) {
+                for (AvailabilitySlot slot : entry.getValue()) {
+                    logger.info("Dropping availability playerId={} reason=template_mismatch", slot.getPlayer().getId());
                 }
+                continue;
             }
-
-            if (templateIndex >= 0) {
-                TourTemplate matchingTemplate = tourTemplates.get(templateIndex);
-                List<PlayerPair> pairs = roundRobinSchedule.get(templateIndex);
-
-                for (AvailabilitySlot oldSlot : oldSlots) {
-                    for (PlayerPair pair : pairs) {
-                        if (pair.player1.getId().equals(oldSlot.getPlayer().getId()) ||
-                            pair.player2.getId().equals(oldSlot.getPlayer().getId())) {
-
-                            String key = matchingTemplate.getId() + "_" + pair.player1.getId() + "_" + pair.player2.getId();
-                            Long newTourId = newTourIdByTemplateAndPlayers.get(key);
-
-                            if (newTourId != null) {
-                                AvailabilitySlot newSlot = AvailabilitySlot.builder()
-                                        .tour(Tour.builder().id(newTourId).build())
-                                        .player(oldSlot.getPlayer())
-                                        .availableSlots(oldSlot.getAvailableSlots())
-                                        .unavailableSlots(oldSlot.getUnavailableSlots())
-                                        .createdAt(oldSlot.getCreatedAt())
-                                        .updatedAt(LocalDateTime.now())
-                                        .build();
-                                availabilitySlotRepository.save(newSlot);
-                                availabilitiesPreserved++;
-                                break;
-                            }
+            List<PlayerPair> pairs = schedule.get(index);
+            for (AvailabilitySlot oldSlot : entry.getValue()) {
+                Long playerId = oldSlot.getPlayer().getId();
+                if (!newPlayerIds.contains(playerId)) {
+                    logger.info("Dropping availability playerId={} reason=player_removed", playerId);
+                    continue;
+                }
+                boolean saved = false;
+                for (PlayerPair pair : pairs) {
+                    if (pair.player1.getId().equals(playerId) || pair.player2.getId().equals(playerId)) {
+                        Long newTourId = tourIdByKey.get(buildKey(newTemplates.get(index).getId(), pair.player1.getId(), pair.player2.getId()));
+                        if (newTourId != null) {
+                            AvailabilitySlot newSlot = AvailabilitySlot.builder().tour(Tour.builder().id(newTourId).build()).player(oldSlot.getPlayer()).availableSlots(oldSlot.getAvailableSlots()).unavailableSlots(oldSlot.getUnavailableSlots()).createdAt(oldSlot.getCreatedAt()).updatedAt(LocalDateTime.now()).build();
+                            availabilitySlotRepository.save(newSlot);
+                            preserved++;
+                            saved = true;
                         }
+                        break;
                     }
                 }
+                if (!saved) {
+                    logger.info("Dropping availability playerId={} reason=no_matching_pair", playerId);
+                }
             }
         }
+        return preserved;
+    }
 
-        logger.info("Regenerated {} tour templates and {} tour pairings for divisionTournamentId: {}. Preserved {} availability slots.",
-                numberOfTours, totalToursCreated, divisionTournamentId, availabilitiesPreserved);
-
-        return totalToursCreated;
+    private String buildKey(Long templateId, Long p1, Long p2) {
+        return templateId + "_" + p1 + "_" + p2;
     }
 
     private List<List<PlayerPair>> generateRoundRobinSchedule(List<Player> players) {
         int n = players.size();
         boolean isOdd = n % 2 == 1;
-
-        List<Player> playerList = new ArrayList<>(players);
+        List<Player> list = new ArrayList<>(players);
         if (isOdd) {
-            playerList.add(null);
+            list.add(null);
             n++;
         }
-
         List<List<PlayerPair>> schedule = new ArrayList<>();
-
         for (int round = 0; round < n - 1; round++) {
             List<PlayerPair> roundPairs = new ArrayList<>();
-
             for (int i = 0; i < n / 2; i++) {
                 int home = i;
                 int away = n - 1 - i;
-
-                Player player1 = playerList.get(home);
-                Player player2 = playerList.get(away);
-
-                if (player1 != null && player2 != null) {
-                    roundPairs.add(new PlayerPair(player1, player2));
+                Player p1 = list.get(home);
+                Player p2 = list.get(away);
+                if (p1 != null && p2 != null) {
+                    roundPairs.add(new PlayerPair(p1, p2));
                 }
             }
-
             schedule.add(roundPairs);
-
-            Player fixed = playerList.get(0);
-            playerList.remove(0);
-            Collections.rotate(playerList, 1);
-            playerList.add(0, fixed);
+            Player fixed = list.get(0);
+            list.remove(0);
+            Collections.rotate(list, 1);
+            list.add(0, fixed);
         }
-
         return schedule;
     }
 
     private static class PlayerPair {
         Player player1;
         Player player2;
+        PlayerPair(Player player1, Player player2) { this.player1 = player1; this.player2 = player2; }
+    }
 
-        PlayerPair(Player player1, Player player2) {
-            this.player1 = player1;
-            this.player2 = player2;
+    private static class GenerationParams {
+        final LocalDateTime startDate;
+        final int durationDays;
+        final Map<Long, List<AvailabilitySlot>> oldAvailabilities;
+        final List<Tour> oldTours;
+        GenerationParams(LocalDateTime startDate, int durationDays, Map<Long, List<AvailabilitySlot>> oldAvailabilities, List<Tour> oldTours) {
+            this.startDate = startDate;
+            this.durationDays = durationDays;
+            this.oldAvailabilities = oldAvailabilities;
+            this.oldTours = oldTours;
         }
     }
 }

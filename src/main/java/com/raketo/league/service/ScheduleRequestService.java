@@ -21,150 +21,109 @@ public class ScheduleRequestService {
     private final TourRepository tourRepository;
 
     @Transactional(readOnly = true)
-    public List<ScheduleRequest> getPlayerRequests(Long playerId) {
-        return scheduleRequestRepository.findByInitiatorPlayerIdOrRecipientPlayerId(playerId, playerId);
-    }
-
-    @Transactional(readOnly = true)
     public List<ScheduleRequest> getTourRequests(Long tourId, Long playerId) {
-        return scheduleRequestRepository.findByTourIdAndInitiatorPlayerIdOrTourIdAndRecipientPlayerId(
-            tourId, playerId, tourId, playerId);
+        return scheduleRequestRepository.findByTourIdAndInitiatorPlayerIdOrTourIdAndRecipientPlayerId(tourId, playerId, tourId, playerId);
     }
 
-    @Transactional
-    public void acceptRequest(Long requestId, Long acceptingPlayerId, BiConsumer<Long, String> messageSender) {
-        ScheduleRequest request = scheduleRequestRepository.findById(requestId)
-                .orElseThrow(() -> new IllegalArgumentException("Request not found"));
-
+    public void acceptRequestLocalized(Long requestId, Long acceptingPlayerId, LocalizationService localizationService, BiConsumer<Long, String> messageSender) {
+        ScheduleRequest request = scheduleRequestRepository.findById(requestId).orElseThrow(() -> new IllegalArgumentException("Request not found"));
         if (!request.getRecipientPlayer().getId().equals(acceptingPlayerId)) {
-            throw new IllegalArgumentException("Only recipient can accept request");
+            throw new IllegalArgumentException(localizationService.msg(request.getRecipientPlayer(), "match.request.accept.only.recipient"));
         }
-
         if (request.getStatus() != ScheduleRequest.ScheduleStatus.Pending) {
-            throw new IllegalArgumentException("Request is not pending");
+            throw new IllegalArgumentException(localizationService.msg(request.getRecipientPlayer(), "match.request.not.pending"));
         }
-
         request.setStatus(ScheduleRequest.ScheduleStatus.Accepted);
         request.setUpdatedAt(LocalDateTime.now());
         scheduleRequestRepository.save(request);
-
         Tour tour = request.getTour();
-
         List<Integer> hours = FormatUtils.parseHoursFromJson(request.getProposedHours());
         if (!hours.isEmpty()) {
             LocalDateTime scheduledTime = request.getProposedDate().atTime(hours.get(0), 0);
             tour.setScheduledTime(scheduledTime);
         }
-
         tour.setStatus(Tour.TourStatus.Scheduled);
         tour.setUpdatedAt(LocalDateTime.now());
         tourRepository.save(tour);
-
         if (messageSender != null) {
-            String notification = buildAcceptanceNotification(request);
-            messageSender.accept(request.getInitiatorPlayer().getTelegramId(), notification);
+            Player initiator = request.getInitiatorPlayer();
+            String timeStr = "";
+            List<Integer> hrs = FormatUtils.parseHoursFromJson(request.getProposedHours());
+            if (!hrs.isEmpty()) {
+                timeStr = FormatUtils.formatHours(hrs);
+            }
+            String notification = localizationService.msg(initiator, "match.request.accept.notification", request.getRecipientPlayer().getName(), FormatUtils.formatDate(request.getProposedDate()), timeStr);
+            messageSender.accept(initiator.getTelegramId(), notification);
         }
     }
 
-    @Transactional
-    public void declineRequest(Long requestId, Long decliningPlayerId, BiConsumer<Long, String> messageSender) {
-        ScheduleRequest request = scheduleRequestRepository.findById(requestId)
-                .orElseThrow(() -> new IllegalArgumentException("Request not found"));
-
+    public void declineRequestLocalized(Long requestId, Long decliningPlayerId, LocalizationService localizationService, BiConsumer<Long, String> messageSender) {
+        ScheduleRequest request = scheduleRequestRepository.findById(requestId).orElseThrow(() -> new IllegalArgumentException("Request not found"));
         if (!request.getRecipientPlayer().getId().equals(decliningPlayerId)) {
-            throw new IllegalArgumentException("Only recipient can decline request");
+            throw new IllegalArgumentException(localizationService.msg(request.getRecipientPlayer(), "match.request.decline.only.recipient"));
         }
-
         if (request.getStatus() != ScheduleRequest.ScheduleStatus.Pending) {
-            throw new IllegalArgumentException("Request is not pending");
+            throw new IllegalArgumentException(localizationService.msg(request.getRecipientPlayer(), "match.request.not.pending"));
         }
-
         request.setStatus(ScheduleRequest.ScheduleStatus.Declined);
         request.setUpdatedAt(LocalDateTime.now());
         scheduleRequestRepository.save(request);
-
         if (messageSender != null) {
-            String notification = buildDeclineNotification(request);
-            messageSender.accept(request.getInitiatorPlayer().getTelegramId(), notification);
+            Player initiator = request.getInitiatorPlayer();
+            String notification = localizationService.msg(initiator, "match.request.decline.notification", request.getRecipientPlayer().getName(), FormatUtils.formatDate(request.getProposedDate()));
+            messageSender.accept(initiator.getTelegramId(), notification);
         }
     }
 
-    private String buildAcceptanceNotification(ScheduleRequest request) {
-        StringBuilder msg = new StringBuilder();
-        msg.append("✅ Your match request was accepted!\n\n");
-        msg.append("Opponent: ").append(request.getRecipientPlayer().getName()).append("\n");
-        msg.append("Date: ").append(FormatUtils.formatDate(request.getProposedDate())).append("\n");
-
-        List<Integer> hours = FormatUtils.parseHoursFromJson(request.getProposedHours());
-        if (!hours.isEmpty()) {
-            msg.append("Time: ").append(FormatUtils.formatHours(hours)).append("\n");
-        }
-
-        return msg.toString();
-    }
-
-    private String buildDeclineNotification(ScheduleRequest request) {
-        StringBuilder msg = new StringBuilder();
-        msg.append("❌ Your match request was declined.\n\n");
-        msg.append("Opponent: ").append(request.getRecipientPlayer().getName()).append("\n");
-        msg.append("Date: ").append(FormatUtils.formatDate(request.getProposedDate())).append("\n");
-
-        return msg.toString();
-    }
-
-
-    public String formatRequestsMessage(List<ScheduleRequest> requests, Player currentPlayer) {
+    public String formatRequestsMessageLocalized(List<ScheduleRequest> requests, Player currentPlayer, LocalizationService localizationService) {
         if (requests.isEmpty()) {
-            return "No match requests.";
+            return localizationService.msg(currentPlayer, "requests.none");
         }
-
         StringBuilder sb = new StringBuilder();
-
-        List<ScheduleRequest> incoming = requests.stream()
-                .filter(r -> r.getRecipientPlayer().getId().equals(currentPlayer.getId()))
-                .toList();
-        List<ScheduleRequest> outgoing = requests.stream()
-                .filter(r -> r.getInitiatorPlayer().getId().equals(currentPlayer.getId()))
-                .toList();
-
+        List<ScheduleRequest> incoming = requests.stream().filter(r -> r.getRecipientPlayer().getId().equals(currentPlayer.getId())).toList();
+        List<ScheduleRequest> outgoing = requests.stream().filter(r -> r.getInitiatorPlayer().getId().equals(currentPlayer.getId())).toList();
         if (!incoming.isEmpty()) {
-            sb.append("📥 Incoming Requests:\n\n");
+            sb.append(localizationService.msg(currentPlayer, "requests.incoming.header"));
             for (ScheduleRequest req : incoming) {
-                sb.append("From: ").append(req.getInitiatorPlayer().getName()).append("\n");
-                sb.append("Date: ").append(FormatUtils.formatDate(req.getProposedDate())).append("\n");
+                sb.append(localizationService.msg(currentPlayer, "requests.from", req.getInitiatorPlayer().getName())).append("\n");
+                sb.append(localizationService.msg(currentPlayer, "requests.date", FormatUtils.formatDate(req.getProposedDate()))).append("\n");
                 List<Integer> hours = FormatUtils.parseHoursFromJson(req.getProposedHours());
                 if (!hours.isEmpty()) {
-                    sb.append("Time: ").append(FormatUtils.formatHours(hours)).append("\n");
+                    sb.append(localizationService.msg(currentPlayer, "requests.time", FormatUtils.formatHours(hours))).append("\n");
                 }
-                sb.append("Status: ").append(getStatusEmoji(req.getStatus())).append(" ").append(req.getStatus()).append("\n");
-                sb.append("ID: ").append(req.getId()).append("\n\n");
+                sb.append(localizationService.msg(currentPlayer, "requests.status", getStatusEmoji(req.getStatus()), req.getStatus())).append("\n");
+                sb.append(localizationService.msg(currentPlayer, "requests.id", req.getId())).append("\n\n");
             }
         }
-
         if (!outgoing.isEmpty()) {
-            sb.append("📤 Outgoing Requests:\n\n");
+            sb.append(localizationService.msg(currentPlayer, "requests.outgoing.header"));
             for (ScheduleRequest req : outgoing) {
-                sb.append("To: ").append(req.getRecipientPlayer().getName()).append("\n");
-                sb.append("Date: ").append(FormatUtils.formatDate(req.getProposedDate())).append("\n");
+                sb.append(localizationService.msg(currentPlayer, "requests.to", req.getRecipientPlayer().getName())).append("\n");
+                sb.append(localizationService.msg(currentPlayer, "requests.date", FormatUtils.formatDate(req.getProposedDate()))).append("\n");
                 List<Integer> hours = FormatUtils.parseHoursFromJson(req.getProposedHours());
                 if (!hours.isEmpty()) {
-                    sb.append("Time: ").append(FormatUtils.formatHours(hours)).append("\n");
+                    sb.append(localizationService.msg(currentPlayer, "requests.time", FormatUtils.formatHours(hours))).append("\n");
                 }
-                sb.append("Status: ").append(getStatusEmoji(req.getStatus())).append(" ").append(req.getStatus()).append("\n\n");
+                sb.append(localizationService.msg(currentPlayer, "requests.status", getStatusEmoji(req.getStatus()), req.getStatus())).append("\n\n");
             }
         }
-
         return sb.toString();
     }
 
     private String getStatusEmoji(ScheduleRequest.ScheduleStatus status) {
-        return switch (status) {
-            case Pending -> "⏳";
-            case Accepted -> "✅";
-            case Declined -> "❌";
-            case Expired -> "🕐";
-            case Cancelled -> "🚫";
-        };
+        switch (status) {
+            case Pending:
+                return "\u23f3";
+            case Accepted:
+                return "\u2705";
+            case Declined:
+                return "\u274c";
+            case Expired:
+                return "\uD83D\uDD50";
+            case Cancelled:
+                return "\uD83D\uDEAB";
+            default:
+                return "";
+        }
     }
 }
-
