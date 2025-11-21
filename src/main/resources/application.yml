@@ -16,6 +16,18 @@ spring:
       hibernate:
         format_sql: true
 
+  messages:
+    basename: i18n/messages
+    encoding: UTF-8
+
+server:
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+  port: ${SERVER_PORT:8080}
+
 telegram:
   bot:
     token: ${TELEGRAM_BOT_TOKEN}
@@ -26,9 +38,6 @@ app:
   base-url: ${BASE_URL:http://localhost:8080}
   webapp:
     enabled: ${WEBAPP_ENABLED:false}
-
-server:
-  port: ${SERVER_PORT:8080}
 
 management:
   endpoints:
@@ -43,4 +52,3 @@ logging:
   level:
     com.raketo: ${LOG_LEVEL:INFO}
     org.telegram: ${LOG_LEVEL:INFO}
-
