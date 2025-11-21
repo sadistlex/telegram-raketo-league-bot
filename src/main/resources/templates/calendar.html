@@ -290,7 +290,7 @@
         function toggleEarlyHours() {
             showEarlyHours = !showEarlyHours;
             const btn = document.getElementById('toggle-early-hours');
-            btn.textContent = showEarlyHours ? /*[[#{web.calendar.toggle.hide}]]*/ 'Hide 00:00-07:00' : /*[[#{web.calendar.toggle.show}]]*/ 'Show 00:00-07:00';
+            btn.textContent = showEarlyHours ? MSG_TOGGLE_HIDE : MSG_TOGGLE_SHOW;
             renderCalendar();
         }
 
@@ -568,7 +568,7 @@
 
         document.getElementById('save-button').addEventListener('click', async () => {
             if (!playerId || !tourId) {
-                tg.showAlert(/*[[#{web.calendar.alert.missing}]]*/'Missing player or tour');
+                tg.showAlert([[#{web.calendar.alert.missing}]]);
                 return;
             }
 
@@ -603,11 +603,11 @@
                 if (res.ok) {
                     tg.close();
                 } else {
-                    tg.showAlert(/*[[#{web.calendar.alert.save.failed}]]*/'Save failed');
+                    tg.showAlert(MSG_ALERT_SAVE_FAILED);
                 }
             } catch (e) {
                 console.error('save', e);
-                tg.showAlert(/*[[#{web.calendar.alert.error}]]*/'Error');
+                tg.showAlert(MSG_ALERT_ERROR);
             }
         });
 
