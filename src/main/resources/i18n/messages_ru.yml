@@ -170,7 +170,7 @@ schedule:
   tour:
     line: "Тур {0} ({1}-{2}) - {3}"
   availability:
-    status: ", доступность: да: {0}, возможно: {1}"
+    status: ", доступность - Вы: {0}, Соперник: {1}"
   status:
     not:
       set: "не указана"
@@ -191,7 +191,7 @@ web:
     subheader: "Выберите дату и окна игры"
     legend:
       available: "Доступен"
-      maybe: "Возможно (мало)"
+      maybe: "Возможно (Авто)"
       busy: "Занято"
     controls:
       available: "Доступен"

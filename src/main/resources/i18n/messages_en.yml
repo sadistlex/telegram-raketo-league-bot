@@ -170,7 +170,7 @@ schedule:
   tour:
     line: "Tour {0} ({1}-{2}) - {3}"
   availability:
-    status: ", Availability: You: {0}, Opponent: {1}"
+    status: ", Availability - You: {0}, Opponent: {1}"
   status:
     not:
       set: "Not Set"
