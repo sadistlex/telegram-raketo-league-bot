@@ -223,7 +223,7 @@ public class AdminCommandHandler {
             Long divisionTournamentId = Long.parseLong(parts[1]);
             List<PlayerDivisionAssignment> assignments = divisionService.getPlayersByDivisionTournament(divisionTournamentId);
             if (assignments.isEmpty()) {
-                bot.sendMessage(chatId, localizationService.msg(player, "admin.schedule.no.players"));
+                bot.sendMessage(chatId, localizationService.msg(player, "admin.schedule.no_players"));
                 return;
             }
             StringBuilder message = new StringBuilder();
@@ -234,7 +234,7 @@ public class AdminCommandHandler {
                 message.append(localizationService.msg(player, "admin.schedule.player.line", ap.getName(), ap.getTelegramUsername())).append("\n");
                 ScheduleService.PlayerSchedule ps = scheduleService.buildPlayerSchedule(ap);
                 if (ps.tours().isEmpty()) {
-                    message.append(localizationService.msg(player, "admin.schedule.no.tours")).append("\n");
+                    message.append(localizationService.msg(player, "admin.schedule.no_tours")).append("\n");
                 } else {
                     int tourNumber = 1;
                     for (ScheduleService.TourInfo ti : ps.tours()) {

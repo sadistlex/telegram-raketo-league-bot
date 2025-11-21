@@ -1,0 +1,238 @@
+player:
+  menu:
+    welcome: "Welcome to Raketo League Bot!\n\nUse the buttons below to navigate:"
+    schedule_button: "📅 My Schedule"
+    help_button: "❓ Help"
+    admin_button: "⚙️ Admin Panel"
+    config_button: "🛠 Language"
+  schedule:
+    refresh: "Refresh"
+    set_availability: "Set Availability (Tour {0})"
+    compatible_times: "Compatible Times (T{0})"
+    view_requests: "View Requests (T{0})"
+  not:
+    registered: "You are not registered. Contact admin."
+  requests:
+    back: "🔙 Back to Schedule"
+    accept_button: "✅ Accept #{0}"
+    decline_button: "❌ Decline #{0}"
+    accepted: "✅ Request accepted! Match has been scheduled."
+    declined: "❌ Request declined."
+    accept:
+      failed: "❌ Failed to accept request: {0}"
+    decline:
+      failed: "❌ Failed to decline request: {0}"
+  help:
+    header: "Player Commands:\n"
+    schedule: "{0} - View schedule"
+    help: "{0} - This help"
+    admin:
+      header: "\nAdmin Commands:\n"
+  unknown:
+    command: "Unknown command. Type {0} for available commands."
+
+requests:
+  none: "No match requests."
+  incoming:
+    header: "📥 Incoming Requests:\n\n"
+  outgoing:
+    header: "📤 Outgoing Requests:\n\n"
+  from: "From: {0}"
+  to: "To: {0}"
+  date: "Date: {0}"
+  time: "Time: {0}"
+  status: "Status: {0} {1}"
+  id: "ID: {0}"
+  accept:
+    failed:
+      generic: "❌ Failed to accept request: {0}"
+  decline:
+    failed:
+      generic: "❌ Failed to decline request: {0}"
+
+admin:
+  panel:
+    header: "🛡️ Admin Panel\n\nSelect an action from the menu below:"
+  menu:
+    list_tournaments: "🏆 List Tournaments"
+    list_players: "👥 List Players"
+    list_divisions: "📊 List Divisions"
+    create_tournament: "➕ Create Tournament"
+    add_player: "👤➕ Add Player"
+    assign_player: "📝 Assign Player"
+    generate_tours: "🗓️ Generate Tours"
+    regenerate_tours: "🔄 Regenerate Tours"
+    view_schedule: "📅 View Schedule"
+    help: "📖 Command Help"
+    player_schedule: "👤 My Schedule"
+  help:
+    header: "Admin Commands:\n\nNote: Use <> for parameters with spaces\n\n"
+    create_tournament:
+      usage: "{0} <name> <desc> <yyyy-MM-dd>"
+      example: "  Example: /createtournament <Summer 2025> <Summer League> <2025-06-01>\n\n"
+    add_player:
+      usage: "{0} <@username> <name>"
+      example: "  Example: /addplayer <@john> <John Doe>\n\n"
+    list_tournaments: "{0} - List all tournaments"
+    list_players: "{0} - List all players"
+    list_divisions: "{0} - List all divisions"
+    assign_player: "{0} <playerId> <divTournamentId>"
+    view_schedule: "{0} <divisionTournamentId>"
+    generate_tours: "{0} <divTournamentId> <yyyy-MM-dd> <days>"
+    regenerate_tours: "{0} <divTournamentId> - Regenerate tours (preserves availability)\n"
+    player:
+      header: "\nPlayer Commands:\n"
+      schedule: "{0} - View your schedule"
+      help: "{0} - Show help"
+  unknown:
+    command: "Unknown admin command. Type /admin for help."
+  cmd:
+    create_tournament:
+      usage: "Use command: {0} <name> <description> <startDate:yyyy-MM-dd>"
+    add_player:
+      usage: "Use command: {0} <@username> <name>"
+    assign_player:
+      usage: "Use command: {0} <playerId> <divisionTournamentId>"
+    generate_tours:
+      usage: "Use command: {0} <divisionTournamentId> <start:yyyy-MM-dd> <intervalDays>"
+    regenerate_tours:
+      usage: "Use command: {0} <divisionTournamentId>"
+    view_schedule:
+      usage: "Use command: {0} <divisionTournamentId>"
+  tournament:
+    created: "Tournament created successfully!\nID: {0}\nName: {1}"
+    create:
+      failed: "Failed to create tournament: {0}"
+      usage: "Usage: {0} <name> <description> <startDate:yyyy-MM-dd>"
+  player:
+    add:
+      usage: "Usage: {0} <@username> <name>"
+      exists: "Player @{0} is already registered."
+      success: "Player added successfully!\nID: {0}\nName: {1}\nUsername: @{2}"
+      failed: "Failed to add player: {0}"
+  schedule:
+    view:
+      usage: "Usage: {0} <divisionTournamentId>"
+      failed: "Failed to view schedule: {0}"
+    no_players: "No players found in this division tournament."
+    div:
+      header: "Schedule for Division Tournament ID: {0}\n\n"
+    player:
+      line: "Player: {0} (@{1})"
+    no_tours: "  No tours assigned"
+    bye: "Bye"
+  tours:
+    generate:
+      usage: "Usage: {0} <divisionTournamentId> <start:yyyy-MM-dd> <intervalDays>"
+      success: "Generated {0} tours."
+      failed: "Failed to generate tours: {0}"
+    regenerate:
+      usage: "Usage: {0} <divisionTournamentId>"
+      success: "Regenerated {0} tours. Availability data preserved where possible. Schedule requests deleted."
+      failed: "Failed to regenerate tours: {0}"
+  tournaments:
+    none: "No tournaments found."
+    header: "Tournaments:\n\n"
+    item: "ID: {0}\nName: {1}\nDescription: {2}\nStart Date: {3}\nActive: {4}\n\n"
+  players:
+    none: "No players found."
+    header: "Players:\n\n"
+    item: "ID: {0}\nName: {1}\nUsername: @{2}\nTelegram ID: {3}\nActive: {4}\n\n"
+  divisions:
+    none: "No divisions found."
+    header: "Divisions:\n\n"
+    item: "ID: {0}\nName: {1}\nLevel: {2}\nActive: {3}\n\n"
+  assign:
+    usage: "Usage: {0} <playerId> <divisionTournamentId>"
+    player:
+      notfound: "Player not found with ID: {0}"
+    divTournament:
+      notfound: "Division Tournament not found with ID: {0}"
+    success: "Player assigned successfully!\nPlayer: {0}\nDivision Tournament ID: {1}"
+    failed: "Failed to assign player: {0}"
+
+match:
+  request:
+    accept:
+      only:
+        recipient: "Only recipient can accept request"
+      notification: "✅ Your match request was accepted!\n\nOpponent: {0}\nDate: {1}\nTime: {2}\n"
+    decline:
+      only:
+        recipient: "Only recipient can decline request"
+      notification: "❌ Your match request was declined.\n\nOpponent: {0}\nDate: {1}\n"
+    not:
+      pending: "Request is not pending"
+
+schedule:
+  header: "Player: {0} (@{1})\n\n"
+  none: "No tours assigned yet."
+  tour:
+    line: "Tour {0} ({1}-{2}) - {3}"
+  availability:
+    status: ", Availability: You: {0}, Opponent: {1}"
+  status:
+    not:
+      set: "Not Set"
+    set: "Set"
+  bye: "Bye"
+
+config:
+  language:
+    header: "Choose language:"
+    ru_button: "🇷🇺 Russian"
+    en_button: "🇬🇧 English"
+    updated: "Language updated to {0}."
+
+web:
+  calendar:
+    title: "Tour Availability"
+    header: "Set Your Availability"
+    subheader: "Select hours for this tour window"
+    legend:
+      available: "Available"
+      maybe: "Maybe (Auto)"
+      busy: "Busy"
+    controls:
+      available: "Available"
+      busy: "Busy"
+    toggle:
+      show: "Show 00:00-07:00"
+      hide: "Hide 00:00-07:00"
+    week:
+      previous: "← Previous"
+      next: "Next →"
+    save: "Save Availability"
+    alert:
+      missing: "Missing player or tour"
+      save:
+        failed: "Save failed"
+      error: "Error"
+  compatible:
+    title: "Compatible Times"
+    header: "Compatible Times"
+    subheader: "Select time slots to send match request"
+    legend:
+      both: "Both Available"
+      oneMaybe: "One Maybe"
+      not: "Not Compatible"
+      selected: "Selected"
+    toggle:
+      show: "Show 00:00-07:00"
+      hide: "Hide 00:00-07:00"
+    week:
+      previous: "← Previous"
+      next: "Next →"
+    send: "Send Match Request"
+    alert:
+      none: "No slots selected"
+      failed: "Failed to send request"
+      error: "Error"
+
+generic:
+  yes: "Yes"
+  no: "No"
+  not:
+    linked: "Not linked"
+  na: "N/A"
+

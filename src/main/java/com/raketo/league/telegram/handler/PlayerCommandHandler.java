@@ -263,12 +263,12 @@ public class PlayerCommandHandler {
             if (req.getRecipientPlayer().getId().equals(player.getId()) && req.getStatus() == ScheduleRequest.ScheduleStatus.Pending) {
                 List<InlineKeyboardButton> row = new ArrayList<>();
                 InlineKeyboardButton acceptBtn = InlineKeyboardButton.builder()
-                        .text(localizationService.msg(player, "player.requests.accept", req.getId()))
+                        .text(localizationService.msg(player, "player.requests.accept_button", req.getId()))
                         .callbackData("ACCEPT_REQUEST_" + req.getId())
                         .build();
                 row.add(acceptBtn);
                 InlineKeyboardButton declineBtn = InlineKeyboardButton.builder()
-                        .text(localizationService.msg(player, "player.requests.decline", req.getId()))
+                        .text(localizationService.msg(player, "player.requests.decline_button", req.getId()))
                         .callbackData("DECLINE_REQUEST_" + req.getId())
                         .build();
                 row.add(declineBtn);
