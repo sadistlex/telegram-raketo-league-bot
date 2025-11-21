@@ -254,7 +254,6 @@
             console.error('Missing required parameters!');
             tg.showAlert('Error: Missing required parameters. Please try again.');
             document.getElementById('week-display').textContent = 'Error: Missing data';
-            return;
         }
 
         let currentMode = 'green';
@@ -614,19 +613,23 @@
 
         if (tourStartDate) currentWeekStart = new Date(tourStartDate);
 
-        setMode('green');
-        loadExisting().then((hasData) => {
-            console.log('Load existing completed, hasData:', hasData);
-            if (!hasData) {
-                console.log('No existing data, setting preset times');
+        if (playerId && tourId && tourStartDate && tourEndDate) {
+            setMode('green');
+            loadExisting().then((hasData) => {
+                console.log('Load existing completed, hasData:', hasData);
+                if (!hasData) {
+                    console.log('No existing data, setting preset times');
+                    setPresetTimes();
+                }
+                renderCalendar();
+            }).catch((err) => {
+                console.error('Error during initialization:', err);
                 setPresetTimes();
-            }
-            renderCalendar();
-        }).catch((err) => {
-            console.error('Error during initialization:', err);
-            setPresetTimes();
-            renderCalendar();
-        });
+                renderCalendar();
+            });
+        } else {
+            console.error('Cannot initialize calendar - missing required parameters');
+        }
     </script>
 </body>
 </html>

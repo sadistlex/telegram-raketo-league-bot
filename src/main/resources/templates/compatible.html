@@ -587,7 +587,11 @@
 
         if (tourStartDate) currentWeekStart = new Date(tourStartDate);
 
-        loadCompatibility();
+        if (playerId && opponentId && tourId && tourStartDate && tourEndDate) {
+            loadCompatibility();
+        } else {
+            console.error('Cannot initialize compatible times - missing required parameters');
+        }
     </script>
 </body>
 </html>

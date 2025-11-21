@@ -53,6 +53,8 @@ public class WebAppController {
                                    @RequestParam Long tourId,
                                    HttpServletRequest request,
                                    Model model) {
+        System.out.println("Compatible endpoint called with playerId=" + playerId + ", opponentId=" + opponentId + ", tourId=" + tourId);
+
         Player player = playerService.findById(playerId)
                 .orElseThrow(() -> new IllegalArgumentException("Player not found"));
         Player opponent = playerService.findById(opponentId)
@@ -71,6 +73,7 @@ public class WebAppController {
         Locale locale = player.getLanguage() == Language.EN ? Locale.ENGLISH : new Locale("ru");
         RequestContextUtils.getLocaleResolver(request).setLocale(request, null, locale);
 
+        System.out.println("Compatible model attributes: " + model.asMap());
         return "compatible";
     }
 }
