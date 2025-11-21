@@ -67,7 +67,7 @@ public class YamlMessageSource extends AbstractResourceBasedMessageSource {
                     factory.setResources(resource);
                     Properties props = factory.getObject();
                     if (props != null) {
-                        properties.putAll(flattenProperties("", props));
+                        properties.putAll(props);
                     }
                 }
             } catch (Exception e) {
@@ -98,21 +98,6 @@ public class YamlMessageSource extends AbstractResourceBasedMessageSource {
 
         Collections.reverse(filenames);
         return filenames;
-    }
-
-    private Properties flattenProperties(String prefix, Properties properties) {
-        Properties result = new Properties();
-
-        for (String key : properties.stringPropertyNames()) {
-            String value = properties.getProperty(key);
-            String fullKey = prefix.isEmpty() ? key : prefix + "." + key;
-
-            if (value != null && !value.trim().isEmpty()) {
-                result.setProperty(fullKey, value);
-            }
-        }
-
-        return result;
     }
 }
 

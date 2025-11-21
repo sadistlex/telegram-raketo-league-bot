@@ -1,5 +1,6 @@
 package com.raketo.league.controller;
 
+import com.raketo.league.model.Language;
 import com.raketo.league.model.Player;
 import com.raketo.league.model.Tour;
 import com.raketo.league.service.PlayerService;
@@ -10,6 +11,10 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.servlet.support.RequestContextUtils;
+
+import jakarta.servlet.http.HttpServletRequest;
+import java.util.Locale;
 
 @Controller
 @RequestMapping("/webapp")
@@ -21,12 +26,16 @@ public class WebAppController {
     @GetMapping("/calendar")
     public String calendar(@RequestParam(required = false) Long playerId,
                            @RequestParam(required = false) Long tourId,
+                           HttpServletRequest request,
                            Model model) {
         if (playerId != null) {
             Player player = playerService.findByTelegramId(playerId)
                     .orElseThrow(() -> new IllegalArgumentException("Player not found"));
             model.addAttribute("playerId", player.getId());
             model.addAttribute("playerName", player.getName());
+
+            Locale locale = player.getLanguage() == Language.EN ? Locale.ENGLISH : new Locale("ru");
+            RequestContextUtils.getLocaleResolver(request).setLocale(request, null, locale);
         }
         if (tourId != null) {
             Tour tour = tourRepository.findById(tourId)
@@ -42,6 +51,7 @@ public class WebAppController {
     public String compatibleTimes(@RequestParam Long playerId,
                                    @RequestParam Long opponentId,
                                    @RequestParam Long tourId,
+                                   HttpServletRequest request,
                                    Model model) {
         Player player = playerService.findById(playerId)
                 .orElseThrow(() -> new IllegalArgumentException("Player not found"));
@@ -57,6 +67,9 @@ public class WebAppController {
         model.addAttribute("tourId", tour.getId());
         model.addAttribute("tourStartDate", tour.getTourTemplate().getStartDate());
         model.addAttribute("tourEndDate", tour.getTourTemplate().getEndDate());
+
+        Locale locale = player.getLanguage() == Language.EN ? Locale.ENGLISH : new Locale("ru");
+        RequestContextUtils.getLocaleResolver(request).setLocale(request, null, locale);
 
         return "compatible";
     }
