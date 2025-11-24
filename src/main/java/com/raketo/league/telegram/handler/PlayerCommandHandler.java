@@ -4,6 +4,7 @@ import com.raketo.league.model.*;
 import com.raketo.league.service.*;
 import com.raketo.league.telegram.BotCommand;
 import com.raketo.league.telegram.TelegramBot;
+import com.raketo.league.util.FormatUtils;
 import com.raketo.league.util.PlayerContextHolder;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -391,35 +392,35 @@ public class PlayerCommandHandler {
         List<List<InlineKeyboardButton>> keyboard = new ArrayList<>();
 
         for (ScheduleRequest req : requests) {
-            List<Integer> hours = com.raketo.league.util.FormatUtils.parseHoursFromJson(req.getProposedHours());
-            String timeLabel = com.raketo.league.util.FormatUtils.formatDateWithDay(req.getProposedDate());
+            List<Integer> hours = FormatUtils.parseHoursFromJson(req.getProposedHours());
+            String timeLabelShort = FormatUtils.formatDateNoYear(req.getProposedDate());
             if (!hours.isEmpty()) {
-                timeLabel += " " + com.raketo.league.util.FormatUtils.formatHours(hours);
+                timeLabelShort += " " + FormatUtils.formatHours(hours);
             }
 
             if (req.getRecipientPlayer().getId().equals(player.getId())) {
                 if (req.getStatus() == ScheduleRequest.ScheduleStatus.Pending) {
                     List<InlineKeyboardButton> row = new ArrayList<>();
                     InlineKeyboardButton acceptBtn = InlineKeyboardButton.builder()
-                            .text(localizationService.msg(player, "player.requests.accept_button", timeLabel))
+                            .text(localizationService.msg(player, "player.requests.accept_button_short", timeLabelShort))
                             .callbackData("ACCEPT_REQUEST_" + req.getId())
                             .build();
                     row.add(acceptBtn);
                     InlineKeyboardButton declineBtn = InlineKeyboardButton.builder()
-                            .text(localizationService.msg(player, "player.requests.decline_button", timeLabel))
+                            .text(localizationService.msg(player, "player.requests.decline_button_short", timeLabelShort))
                             .callbackData("DECLINE_REQUEST_" + req.getId())
                             .build();
                     row.add(declineBtn);
                     keyboard.add(row);
                 } else if (req.getStatus() == ScheduleRequest.ScheduleStatus.Accepted) {
                     InlineKeyboardButton changeToDeclineBtn = InlineKeyboardButton.builder()
-                            .text(localizationService.msg(player, "player.requests.change_to_decline_button", timeLabel))
+                            .text(localizationService.msg(player, "player.requests.change_to_decline_button_short", timeLabelShort))
                             .callbackData("CHANGE_TO_DECLINE_" + req.getId())
                             .build();
                     keyboard.add(List.of(changeToDeclineBtn));
                 } else if (req.getStatus() == ScheduleRequest.ScheduleStatus.Declined) {
                     InlineKeyboardButton changeToAcceptBtn = InlineKeyboardButton.builder()
-                            .text(localizationService.msg(player, "player.requests.change_to_accept_button", timeLabel))
+                            .text(localizationService.msg(player, "player.requests.change_to_accept_button_short", timeLabelShort))
                             .callbackData("CHANGE_TO_ACCEPT_" + req.getId())
                             .build();
                     keyboard.add(List.of(changeToAcceptBtn));
@@ -427,7 +428,7 @@ public class PlayerCommandHandler {
             } else if (req.getInitiatorPlayer().getId().equals(player.getId())) {
                 if (req.getStatus() != ScheduleRequest.ScheduleStatus.Cancelled) {
                     InlineKeyboardButton cancelBtn = InlineKeyboardButton.builder()
-                            .text(localizationService.msg(player, "player.requests.cancel_button", timeLabel))
+                            .text(localizationService.msg(player, "player.requests.cancel_button_short", timeLabelShort))
                             .callbackData("CANCEL_REQUEST_" + req.getId())
                             .build();
                     keyboard.add(List.of(cancelBtn));

@@ -28,6 +28,12 @@ public class FormatUtils {
         return date.format(DATE_FORMATTER);
     }
 
+    public static String formatDateNoYear(java.time.LocalDate date) {
+        if (date == null) return "";
+        DateTimeFormatter noYear = DateTimeFormatter.ofPattern("dd.MM");
+        return date.format(noYear);
+    }
+
     public static String formatDateWithDay(java.time.LocalDate date) {
         if (date == null) return "";
         String dayName = getDayName(date.getDayOfWeek());
@@ -96,4 +102,3 @@ public class FormatUtils {
         }
     }
 }
-

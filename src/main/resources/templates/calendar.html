@@ -310,9 +310,20 @@
 
         const MSG_TOGGLE_HIDE = /*[[#{web.calendar.toggle.hide}]]*/ 'Hide 00:00-07:00';
         const MSG_TOGGLE_SHOW = /*[[#{web.calendar.toggle.show}]]*/ 'Show 00:00-07:00';
-        const MSG_ALERT_MISSING = /*[[#{web.calendar.alert.missing}]]*/ 'Missing player or tour';
-        const MSG_ALERT_SAVE_FAILED = /*[[#{web.calendar.alert.save.failed}]]*/ 'Save failed';
-        const MSG_ALERT_ERROR = /*[[#{web.calendar.alert.error}]]*/ 'Error';
+        const MSG_SHOW_WEEK = /*[[#{web.calendar.show.week}]]*/ 'Show Week';
+        const MSG_SHOW_FEW = /*[[#{web.calendar.show.few}]]*/ 'Show 1-4 Days';
+        const MSG_ALL = /*[[#{web.calendar.controls.all}]]*/ 'All';
+        const MSG_HOUR_CYCLE_TITLE = /*[[#{web.calendar.hour.cycle.title}]]*/ 'Cycle this hour for all days';
+
+        const DAY_NAMES = [
+            /*[[#{web.calendar.day.short.mon}]]*/ 'Mon',
+            /*[[#{web.calendar.day.short.tue}]]*/ 'Tue',
+            /*[[#{web.calendar.day.short.wed}]]*/ 'Wed',
+            /*[[#{web.calendar.day.short.thu}]]*/ 'Thu',
+            /*[[#{web.calendar.day.short.fri}]]*/ 'Fri',
+            /*[[#{web.calendar.day.short.sat}]]*/ 'Sat',
+            /*[[#{web.calendar.day.short.sun}]]*/ 'Sun'
+        ];
 
         console.log('Calendar initialized with:', { playerId, tourId, tourStartDate, tourEndDate });
 
@@ -326,6 +337,7 @@
         let currentWeekStart = new Date();
         let weekDates = [];
         let isDragging = false;
+        let dragColor = null;
         let showEarlyHours = false;
         let isMobileView = window.innerWidth <= 768;
         let currentDayIndex = 0;
@@ -348,9 +360,11 @@
 
         document.addEventListener('mouseup', () => {
             isDragging = false;
+            dragColor = null;
         });
         document.addEventListener('touchend', () => {
             isDragging = false;
+            dragColor = null;
         });
 
         window.addEventListener('resize', () => {
@@ -366,7 +380,7 @@
 
         function toggleShowAllDays() {
             showAllDays = !showAllDays;
-            document.getElementById('show-all-days').textContent = showAllDays ? 'Show 1-2 Days' : 'Show Week';
+            document.getElementById('show-all-days').textContent = showAllDays ? MSG_SHOW_FEW : MSG_SHOW_WEEK;
             renderCalendar();
         }
 
@@ -485,16 +499,16 @@
 
             let displayDates = weekDates;
             if (isMobileView && !showAllDays) {
-                const endIndex = Math.min(currentDayIndex + 2, weekDates.length);
+                const endIndex = Math.min(currentDayIndex + 4, weekDates.length);
                 displayDates = weekDates.slice(currentDayIndex, endIndex);
 
-                const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
                 if (displayDates.length === 1) {
-                    document.getElementById('day-display').textContent =
-                        `${dayNames[displayDates[0].getDay()]} ${formatDate(displayDates[0])}`;
+                    const dn = DAY_NAMES[displayDates[0].getDay() === 0 ? 6 : displayDates[0].getDay()-1];
+                    document.getElementById('day-display').textContent = `${dn} ${formatDate(displayDates[0])}`;
                 } else {
-                    document.getElementById('day-display').textContent =
-                        `${dayNames[displayDates[0].getDay()]} - ${dayNames[displayDates[displayDates.length-1].getDay()]}`;
+                    const startDn = DAY_NAMES[displayDates[0].getDay() === 0 ? 6 : displayDates[0].getDay()-1];
+                    const endDn = DAY_NAMES[displayDates[displayDates.length-1].getDay() === 0 ? 6 : displayDates[displayDates.length-1].getDay()-1];
+                    document.getElementById('day-display').textContent = `${startDn} - ${endDn}`;
                 }
 
                 document.getElementById('prev-day').disabled = currentDayIndex === 0;
@@ -507,7 +521,7 @@
             let headerHtml = '<tr><th class="time-header"></th>';
             displayDates.forEach((d, idx) => {
                 const actualIdx = showAllDays ? idx : currentDayIndex + idx;
-                const dayName = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][d.getDay() === 0 ? 6 : d.getDay()-1];
+                const dayName = DAY_NAMES[d.getDay() === 0 ? 6 : d.getDay()-1];
                 headerHtml += `<th>
                     ${dayName}<br/>${formatDate(d)}<br/>
                     <div style="margin-top: 4px; display: flex; gap: 2px; justify-content: center;">
@@ -516,7 +530,7 @@
                     </div>
                 </th>`;
             });
-            headerHtml += '<th class="hour-control-header">All</th></tr>';
+            headerHtml += `<th class="hour-control-header">${MSG_ALL}</th></tr>`;
             header.innerHTML = headerHtml;
 
             body.innerHTML = '';
@@ -527,7 +541,7 @@
                 const row = document.createElement('tr');
                 const timeCell = document.createElement('td');
                 timeCell.className = 'time-label';
-                timeCell.textContent = `${String(hour).padStart(2, '0')}:00`;
+                timeCell.textContent = `${String(hour).padStart(2, '0')}:00-${String(hour).padStart(2, '0')}:59`;
                 row.appendChild(timeCell);
 
                 displayDates.forEach(date => {
@@ -542,7 +556,21 @@
                     slot.addEventListener('mousedown', (e) => {
                         e.preventDefault();
                         isDragging = true;
-                        const newColor = cycleColor(currentColor);
+                        const current = slots[key] || 'yellow';
+                        const newColor = cycleColor(current);
+                        dragColor = newColor === 'yellow' ? null : newColor;
+                        if (newColor === 'yellow') {
+                            delete slots[key];
+                        } else {
+                            slots[key] = newColor;
+                        }
+                        slot.className = `time-slot ${newColor}`;
+                    });
+
+                    slot.addEventListener('click', (e) => {
+                        // support simple clicks (no drag)
+                        const current = slots[key] || 'yellow';
+                        const newColor = cycleColor(current);
                         if (newColor === 'yellow') {
                             delete slots[key];
                         } else {
@@ -553,21 +581,23 @@
 
                     slot.addEventListener('mouseenter', () => {
                         if (isDragging) {
-                            const currentSlotColor = slots[key] || 'yellow';
-                            const newColor = cycleColor(currentSlotColor);
-                            if (newColor === 'yellow') {
+                            if (dragColor === null) {
+                                // if dragColor null means clearing
                                 delete slots[key];
+                                slot.className = `time-slot yellow`;
                             } else {
-                                slots[key] = newColor;
+                                slots[key] = dragColor;
+                                slot.className = `time-slot ${dragColor}`;
                             }
-                            slot.className = `time-slot ${newColor}`;
                         }
                     });
 
                     slot.addEventListener('touchstart', (e) => {
                         e.preventDefault();
                         isDragging = true;
-                        const newColor = cycleColor(currentColor);
+                        const current = slots[key] || 'yellow';
+                        const newColor = cycleColor(current);
+                        dragColor = newColor === 'yellow' ? null : newColor;
                         if (newColor === 'yellow') {
                             delete slots[key];
                         } else {
@@ -591,15 +621,13 @@
                                     const touchDate = displayDates[cellIndex];
                                     const touchHour = displayStartHourCalc + rowIndex;
                                     const touchKey = getSlotKey(touchDate, touchHour);
-                                    const touchCurrentColor = slots[touchKey] || 'yellow';
-                                    const touchNewColor = cycleColor(touchCurrentColor);
-
-                                    if (touchNewColor === 'yellow') {
+                                    if (dragColor === null) {
                                         delete slots[touchKey];
+                                        element.className = `time-slot yellow`;
                                     } else {
-                                        slots[touchKey] = touchNewColor;
+                                        slots[touchKey] = dragColor;
+                                        element.className = `time-slot ${dragColor}`;
                                     }
-                                    element.className = `time-slot ${touchNewColor}`;
                                 }
                             }
                         }
@@ -614,7 +642,7 @@
                 const hourBtn = document.createElement('button');
                 hourBtn.className = 'hour-btn';
                 hourBtn.textContent = '↔';
-                hourBtn.title = 'Cycle this hour for all days';
+                hourBtn.title = MSG_HOUR_CYCLE_TITLE;
                 hourBtn.onclick = () => {
                     const firstDayKey = getSlotKey(weekDates[0], hour);
                     const currentHourColor = slots[firstDayKey] || 'yellow';
