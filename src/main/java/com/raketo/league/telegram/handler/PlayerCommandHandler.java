@@ -140,6 +140,12 @@ public class PlayerCommandHandler {
             } else if (callbackData.startsWith("CHANGE_TO_DECLINE_")) {
                 Long requestId = Long.parseLong(callbackData.substring("CHANGE_TO_DECLINE_".length()));
                 handleChangeRequestStatus(chatId, userId, username, requestId, ScheduleRequest.ScheduleStatus.Declined, bot);
+            } else if (callbackData.startsWith("BOOK_REQUEST_")) {
+                Long requestId = Long.parseLong(callbackData.substring("BOOK_REQUEST_".length()));
+                handleBookRequest(chatId, userId, username, requestId, bot);
+            } else if (callbackData.startsWith("UNBOOK_REQUEST_")) {
+                Long requestId = Long.parseLong(callbackData.substring("UNBOOK_REQUEST_".length()));
+                handleUnbookRequest(chatId, userId, username, requestId, bot);
             } else if (callbackData.startsWith("COMPLETE_TOUR_")) {
                 Long tourId = Long.parseLong(callbackData.substring("COMPLETE_TOUR_".length()));
                 handleCompleteTour(chatId, userId, username, tourId, bot);
@@ -220,9 +226,10 @@ public class PlayerCommandHandler {
         if (divisions.size() > 1) {
             showDivisionSelection(chatId, player, divisions, bot);
         } else {
+            Long divisionTournamentId = divisions.isEmpty() ? null : divisions.getFirst().getDivisionTournament().getId();
             ScheduleService.PlayerSchedule ps = scheduleService.buildPlayerSchedule(player);
             String messageText = renderScheduleMessageLocalized(ps, player);
-            SendMessage message = SendMessage.builder().chatId(chatId.toString()).text(messageText).replyMarkup(scheduleKeyboardWithTours(ps, player)).build();
+            SendMessage message = SendMessage.builder().chatId(chatId.toString()).text(messageText).replyMarkup(scheduleKeyboardWithTours(ps, player, divisionTournamentId)).build();
             try {
                 bot.execute(message);
             } catch (Exception e) {
@@ -269,7 +276,7 @@ public class PlayerCommandHandler {
 
         ScheduleService.PlayerSchedule ps = scheduleService.buildPlayerScheduleForDivision(player, divisionTournamentId);
         String messageText = renderScheduleMessageLocalized(ps, player);
-        SendMessage message = SendMessage.builder().chatId(chatId.toString()).text(messageText).replyMarkup(scheduleKeyboardWithTours(ps, player)).build();
+        SendMessage message = SendMessage.builder().chatId(chatId.toString()).text(messageText).replyMarkup(scheduleKeyboardWithTours(ps, player, divisionTournamentId)).build();
         try {
             bot.execute(message);
         } catch (Exception e) {
@@ -341,7 +348,7 @@ public class PlayerCommandHandler {
         return sb.toString();
     }
 
-    private InlineKeyboardMarkup scheduleKeyboardWithTours(ScheduleService.PlayerSchedule schedule, Player player) {
+    private InlineKeyboardMarkup scheduleKeyboardWithTours(ScheduleService.PlayerSchedule schedule, Player player, Long divisionTournamentId) {
         List<List<InlineKeyboardButton>> keyboard = new ArrayList<>();
         if (webappEnabled) {
             int tourNumber = 1;
@@ -374,9 +381,12 @@ public class PlayerCommandHandler {
                 .callbackData("PLAYER_MENU")
                 .build();
         keyboard.add(List.of(mainMenuBtn));
+
+        String refreshCallbackData = divisionTournamentId != null ?
+            "SCHEDULE_DIVISION_" + divisionTournamentId : "PLAYER_SCHEDULE_REFRESH";
         InlineKeyboardButton refresh = InlineKeyboardButton.builder()
                 .text(localizationService.msg(player, "player.schedule.refresh"))
-                .callbackData("PLAYER_SCHEDULE_REFRESH")
+                .callbackData(refreshCallbackData)
                 .build();
         keyboard.add(List.of(refresh));
         return InlineKeyboardMarkup.builder().keyboard(keyboard).build();
@@ -421,6 +431,11 @@ public class PlayerCommandHandler {
                 timeLabelShort += " " + FormatUtils.formatHours(hours);
             }
 
+            // Check if current player is responsible for booking
+            Tour tour = req.getTour();
+            Player responsiblePlayer = tour.getResponsiblePlayer();
+            boolean isResponsible = responsiblePlayer != null && responsiblePlayer.getId().equals(player.getId());
+
             if (req.getRecipientPlayer().getId().equals(player.getId())) {
                 if (req.getStatus() == ScheduleRequest.ScheduleStatus.Pending) {
                     List<InlineKeyboardButton> row = new ArrayList<>();
@@ -456,6 +471,21 @@ public class PlayerCommandHandler {
                             .build();
                     keyboard.add(List.of(cancelBtn));
                 }
+            }
+
+            // Add book/unbook button for responsible player
+            if (isResponsible && req.getStatus() == ScheduleRequest.ScheduleStatus.Accepted) {
+                InlineKeyboardButton bookBtn = InlineKeyboardButton.builder()
+                        .text(localizationService.msg(player, "player.requests.book_button_short", timeLabelShort))
+                        .callbackData("BOOK_REQUEST_" + req.getId())
+                        .build();
+                keyboard.add(List.of(bookBtn));
+            } else if (isResponsible && req.getStatus() == ScheduleRequest.ScheduleStatus.Booked) {
+                InlineKeyboardButton unbookBtn = InlineKeyboardButton.builder()
+                        .text(localizationService.msg(player, "player.requests.unbook_button_short", timeLabelShort))
+                        .callbackData("UNBOOK_REQUEST_" + req.getId())
+                        .build();
+                keyboard.add(List.of(unbookBtn));
             }
         }
 
@@ -533,6 +563,34 @@ public class PlayerCommandHandler {
         }
     }
 
+    private void handleBookRequest(Long chatId, Long userId, String username, Long requestId, TelegramBot bot) {
+        Player player = playerService.findOrLinkPlayer(userId, username);
+        if (player == null) {
+            bot.sendMessage(chatId, localizationService.resolve(Language.RU, "player.not.registered"));
+            return;
+        }
+        try {
+            scheduleRequestService.bookRequestLocalized(requestId, player.getId(), localizationService, bot::sendMessage);
+            bot.sendMessage(chatId, localizationService.msg(player, "player.requests.booked"));
+        } catch (Exception e) {
+            bot.sendMessage(chatId, localizationService.msg(player, "player.requests.book.failed", e.getMessage()));
+        }
+    }
+
+    private void handleUnbookRequest(Long chatId, Long userId, String username, Long requestId, TelegramBot bot) {
+        Player player = playerService.findOrLinkPlayer(userId, username);
+        if (player == null) {
+            bot.sendMessage(chatId, localizationService.resolve(Language.RU, "player.not.registered"));
+            return;
+        }
+        try {
+            scheduleRequestService.unbookRequestLocalized(requestId, player.getId(), localizationService, bot::sendMessage);
+            bot.sendMessage(chatId, localizationService.msg(player, "player.requests.unbooked"));
+        } catch (Exception e) {
+            bot.sendMessage(chatId, localizationService.msg(player, "player.requests.unbook.failed", e.getMessage()));
+        }
+    }
+
     private void handleManageTour(Long chatId, Long userId, String username, Long tourId, TelegramBot bot) {
         Player player = playerService.findOrLinkPlayer(userId, username);
         if (player == null) {
@@ -540,8 +598,9 @@ public class PlayerCommandHandler {
             return;
         }
 
-        ScheduleService.PlayerSchedule schedule = scheduleService.buildPlayerSchedule(player);
-        ScheduleService.TourInfo tourInfo = schedule.tours().stream()
+        // First get the tour to find its division
+        ScheduleService.PlayerSchedule fullSchedule = scheduleService.buildPlayerSchedule(player);
+        ScheduleService.TourInfo tourInfo = fullSchedule.tours().stream()
                 .filter(ti -> ti.tourId() != null && ti.tourId().equals(tourId))
                 .findFirst()
                 .orElse(null);
@@ -551,7 +610,15 @@ public class PlayerCommandHandler {
             return;
         }
 
-        int tourNumber = schedule.tours().indexOf(tourInfo) + 1;
+        // Get division-specific schedule to calculate correct tour number
+        Long divisionTournamentId = tourInfo.divisionTournamentId();
+        ScheduleService.PlayerSchedule divisionSchedule = scheduleService.buildPlayerScheduleForDivision(player, divisionTournamentId);
+        int tourNumber = divisionSchedule.tours().indexOf(
+            divisionSchedule.tours().stream()
+                .filter(ti -> ti.tourId() != null && ti.tourId().equals(tourId))
+                .findFirst()
+                .orElse(null)
+        ) + 1;
         StringBuilder message = new StringBuilder();
         message.append(localizationService.msg(player, "tour.manage.header", tourNumber)).append("\n\n");
 
@@ -584,8 +651,7 @@ public class PlayerCommandHandler {
                 }
                 message.append(localizationService.msg(player, "player.courts.setup.opponent", courtsList.toString())).append("\n");
             } else {
-                message.append(localizationService.msg(player, "player.courts.setup.opponent",
-                    localizationService.msg(player, "player.courts.setup.not_set"))).append("\n");
+                message.append(localizationService.msg(player, "player.courts.opponent.not_set")).append("\n");
             }
         }
 
@@ -633,8 +699,10 @@ public class PlayerCommandHandler {
 
         List<List<InlineKeyboardButton>> keyboard = new ArrayList<>();
 
+        String availabilityButtonKey = playerSlots.isEmpty() ?
+                "tour.manage.button.availability" : "tour.manage.button.change_availability";
         InlineKeyboardButton setAvailabilityBtn = InlineKeyboardButton.builder()
-                .text(localizationService.msg(player, "tour.manage.button.availability"))
+                .text(localizationService.msg(player, availabilityButtonKey))
                 .webApp(new WebAppInfo(baseUrl + "/webapp/calendar?playerId=" + player.getTelegramId() + "&tourId=" + tourId))
                 .build();
         keyboard.add(List.of(setAvailabilityBtn));
@@ -657,13 +725,15 @@ public class PlayerCommandHandler {
                 .build();
         keyboard.add(List.of(acceptedRequestsBtn, allRequestsBtn));
 
-        if (tourInfo.status() == Tour.TourStatus.Active || tourInfo.status() == Tour.TourStatus.Scheduled) {
+        if (tourInfo.status() == Tour.TourStatus.Active || tourInfo.status() == Tour.TourStatus.Scheduled || tourInfo.status() == Tour.TourStatus.Postponed) {
             InlineKeyboardButton completeBtn = InlineKeyboardButton.builder()
                     .text(localizationService.msg(player, "tour.manage.button.complete"))
                     .callbackData("COMPLETE_TOUR_" + tourId)
                     .build();
             keyboard.add(List.of(completeBtn));
+        }
 
+        if (tourInfo.status() == Tour.TourStatus.Active || tourInfo.status() == Tour.TourStatus.Scheduled) {
             InlineKeyboardButton postponeBtn = InlineKeyboardButton.builder()
                     .text(localizationService.msg(player, "tour.manage.button.postpone"))
                     .callbackData("POSTPONE_TOUR_" + tourId)
@@ -671,9 +741,11 @@ public class PlayerCommandHandler {
             keyboard.add(List.of(postponeBtn));
         }
 
+        String backCallbackData = divisionTournamentId != null ?
+            "SCHEDULE_DIVISION_" + divisionTournamentId : "PLAYER_SCHEDULE";
         InlineKeyboardButton backBtn = InlineKeyboardButton.builder()
                 .text(localizationService.msg(player, "tour.manage.button.back"))
-                .callbackData("PLAYER_SCHEDULE")
+                .callbackData(backCallbackData)
                 .build();
         keyboard.add(List.of(backBtn));
 

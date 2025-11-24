@@ -62,11 +62,12 @@ public class ScheduleService {
             Tour.TourStatus status = tour != null ? tour.getStatus() : null;
             LocalDateTime scheduledTime = tour != null ? tour.getScheduledTime() : null;
             Player responsiblePlayer = tour != null ? tour.getResponsiblePlayer() : null;
-            tourInfos.add(new TourInfo(tourId, template.getStartDate(), template.getEndDate(), status, opponent, scheduledTime, responsiblePlayer));
+            Long divisionTournamentId = template.getDivisionTournament().getId();
+            tourInfos.add(new TourInfo(tourId, template.getStartDate(), template.getEndDate(), status, opponent, scheduledTime, responsiblePlayer, divisionTournamentId));
         }
         return new PlayerSchedule(player, tourInfos);
     }
 
     public record PlayerSchedule(Player player, List<TourInfo> tours) {}
-    public record TourInfo(Long tourId, LocalDateTime startDate, LocalDateTime endDate, Tour.TourStatus status, Player opponent, LocalDateTime scheduledTime, Player responsiblePlayer) {}
+    public record TourInfo(Long tourId, LocalDateTime startDate, LocalDateTime endDate, Tour.TourStatus status, Player opponent, LocalDateTime scheduledTime, Player responsiblePlayer, Long divisionTournamentId) {}
 }

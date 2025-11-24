@@ -48,5 +48,5 @@ public class ScheduleRequest {
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
-    public enum ScheduleStatus { Pending, Accepted, Declined, Expired, Cancelled }
+    public enum ScheduleStatus { Pending, Accepted, Declined, Expired, Cancelled, Booked }
 }

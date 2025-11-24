@@ -22,15 +22,29 @@ player:
     back: "🔙 Back to Schedule"
     accept_button_short: "✅ {0}"
     decline_button_short: "❌ {0}"
-    change_to_accept_button_short: "✅ Accept {0}"
-    change_to_decline_button_short: "❌ Deny {0}"
-    cancel_button_short: "🚫 Cancel {0}"
+    change_to_accept_button_short: "✅ {0}"
+    change_to_decline_button_short: "❌ {0}"
+    cancel_button_short: "🚫 {0}"
+    book_button_short: "🎾 Book {0}"
+    unbook_button_short: "↩️ Unbook {0}"
     accepted: "✅ Request accepted! Match has been scheduled."
     declined: "❌ Request declined."
+    cancelled: "🚫 Request cancelled."
+    booked: "🎾 Court booking marked! Opponent has been notified."
+    unbooked: "↩️ Booking status reverted to accepted."
     accept:
       failed: "❌ Failed to accept request: {0}"
     decline:
       failed: "❌ Failed to decline request: {0}"
+    cancel:
+      failed: "❌ Failed to cancel request: {0}"
+    book:
+      failed: "❌ Failed to mark as booked: {0}"
+    unbook:
+      failed: "❌ Failed to unbook: {0}"
+    change:
+      failed: "❌ Failed to change status: {0}"
+    status_changed: "✅ Request status changed."
   help:
     header: "📋 Player Commands & Features:\n\n"
     schedule: "{0} - View your match schedule\n"
@@ -48,6 +62,8 @@ player:
       saved: "✅ Preferred courts saved!"
       opponent: "Opponent's preferred courts: {0}"
       not_set: "not set"
+    opponent:
+      not_set: "Opponent has not yet set preferred courts"
   unknown:
     command: "Unknown command. Type {0} for available commands."
 
@@ -181,6 +197,16 @@ match:
       only:
         initiator: "Only initiator can cancel request"
       notification: "🚫 Match request was cancelled.\n\nOpponent: {0}\nDate: {1}\n"
+    book:
+      only:
+        accepted: "Only accepted requests can be marked as booked"
+        responsible: "Only responsible player can mark request as booked"
+      notification: "🎾 Court has been booked!\n\n{0} has booked the court for your match.\nDate: {1}\nTime: {2}\n"
+    unbook:
+      only:
+        booked: "Only booked requests can be unbooked"
+        responsible: "Only responsible player can unbook request"
+      notification: "↩️ Court booking status changed.\n\n{0} has reverted the booking status.\nDate: {1}\n"
     change:
       only:
         recipient: "Only recipient can change request status"
@@ -199,6 +225,9 @@ schedule:
     dates: "📅 {0}-{1}"
     status: "Status: {0}"
     opponent_name: "Opponent: {0}"
+    responsible:
+      you: "📞 Responsible for court booking: You"
+      opponent: "📞 Responsible for court booking: {0}"
     availability: "Availability:"
     you: "  You: {0}"
     opponent:
@@ -238,6 +267,7 @@ tour:
     status: "Status: {0}"
     button:
       availability: "📝 Set Availability"
+      change_availability: "📝 Change Availability"
       compatible: "🕐 Compatible Times"
       requests:
         accepted: "✅ Accepted Requests"

@@ -269,16 +269,9 @@
 
     <div class="calendar-container">
         <div class="week-selector">
-            <button id="prev-week" th:text="#{web.compatible.week.previous}">← Previous</button>
+            <button id="nav-left">←</button>
             <span id="week-display">Loading...</span>
-            <button id="next-week" th:text="#{web.compatible.week.next}">Next →</button>
-        </div>
-
-        <div class="day-nav">
-            <button id="prev-day">←</button>
-            <span id="day-display">Loading...</span>
-            <button id="next-day">→</button>
-            <button id="show-all-days">Show Week</button>
+            <button id="nav-right">→</button>
         </div>
 
         <div class="calendar-grid">
@@ -305,7 +298,8 @@
         const MSG_TOGGLE_SHOW = /*[[#{web.compatible.toggle.show}]]*/ 'Show 00:00-07:00';
         const MSG_SHOW_WEEK = /*[[#{web.compatible.show.week}]]*/ 'Show Week';
         const MSG_SHOW_FEW = /*[[#{web.compatible.show.few}]]*/ 'Show 1-4 Days';
-        const MSG_ALL = /*[[#{web.compatible.controls.all}]]*/ 'All';
+        const MSG_SCROLL_RIGHT = '→';
+        const MSG_SCROLL_LEFT = '←';
 
         const DAY_NAMES = [
             /*[[#{web.compatible.day.short.mon}]]*/ 'Mon',
@@ -335,6 +329,7 @@
         let isMobileView = window.innerWidth <= 768;
         let currentDayIndex = 0;
         let showAllDays = !isMobileView;
+        let scrollButtonSide = 'right';
 
         const startHour = 0;
         const endHour = 23;

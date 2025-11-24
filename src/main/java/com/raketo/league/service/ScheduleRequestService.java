@@ -121,6 +121,8 @@ public class ScheduleRequestService {
                 return "\uD83D\uDD50";
             case Cancelled:
                 return "\uD83D\uDEAB";
+            case Booked:
+                return "🎾";
             default:
                 return "";
         }
@@ -247,4 +249,74 @@ public class ScheduleRequestService {
             messageSender.accept(initiator.getTelegramId(), notification);
         }
     }
+
+    @Transactional
+    public void bookRequestLocalized(Long requestId, Long bookingPlayerId, LocalizationService localizationService, BiConsumer<Long, String> messageSender) {
+        ScheduleRequest request = scheduleRequestRepository.findById(requestId)
+                .orElseThrow(() -> new IllegalArgumentException("Request not found"));
+
+        if (request.getStatus() != ScheduleRequest.ScheduleStatus.Accepted) {
+            throw new IllegalArgumentException(localizationService.msg(null, "match.request.book.only.accepted"));
+        }
+
+        Tour tour = request.getTour();
+        Player responsiblePlayer = tour.getResponsiblePlayer();
+
+        if (responsiblePlayer == null || !responsiblePlayer.getId().equals(bookingPlayerId)) {
+            throw new IllegalArgumentException(localizationService.msg(null, "match.request.book.only.responsible"));
+        }
+
+        request.setStatus(ScheduleRequest.ScheduleStatus.Booked);
+        request.setUpdatedAt(LocalDateTime.now());
+        scheduleRequestRepository.save(request);
+
+        if (messageSender != null) {
+            Player opponent = request.getInitiatorPlayer().getId().equals(bookingPlayerId) ?
+                request.getRecipientPlayer() : request.getInitiatorPlayer();
+
+            List<Integer> hours = FormatUtils.parseHoursFromJson(request.getProposedHours());
+            String timeStr = "";
+            if (!hours.isEmpty()) {
+                timeStr = FormatUtils.formatHours(hours);
+            }
+
+            String notification = localizationService.msg(opponent, "match.request.book.notification",
+                responsiblePlayer.getName(),
+                FormatUtils.formatDate(request.getProposedDate()),
+                timeStr);
+            messageSender.accept(opponent.getTelegramId(), notification);
+        }
+    }
+
+    @Transactional
+    public void unbookRequestLocalized(Long requestId, Long unbookingPlayerId, LocalizationService localizationService, BiConsumer<Long, String> messageSender) {
+        ScheduleRequest request = scheduleRequestRepository.findById(requestId)
+                .orElseThrow(() -> new IllegalArgumentException("Request not found"));
+
+        if (request.getStatus() != ScheduleRequest.ScheduleStatus.Booked) {
+            throw new IllegalArgumentException(localizationService.msg(null, "match.request.unbook.only.booked"));
+        }
+
+        Tour tour = request.getTour();
+        Player responsiblePlayer = tour.getResponsiblePlayer();
+
+        if (responsiblePlayer == null || !responsiblePlayer.getId().equals(unbookingPlayerId)) {
+            throw new IllegalArgumentException(localizationService.msg(null, "match.request.unbook.only.responsible"));
+        }
+
+        request.setStatus(ScheduleRequest.ScheduleStatus.Accepted);
+        request.setUpdatedAt(LocalDateTime.now());
+        scheduleRequestRepository.save(request);
+
+        if (messageSender != null) {
+            Player opponent = request.getInitiatorPlayer().getId().equals(unbookingPlayerId) ?
+                request.getRecipientPlayer() : request.getInitiatorPlayer();
+
+            String notification = localizationService.msg(opponent, "match.request.unbook.notification",
+                responsiblePlayer.getName(),
+                FormatUtils.formatDate(request.getProposedDate()));
+            messageSender.accept(opponent.getTelegramId(), notification);
+        }
+    }
 }
+
