@@ -149,7 +149,7 @@ public class ScheduleRequestService {
         Tour tour = tourRepository.findById(tourId)
                 .orElseThrow(() -> new IllegalArgumentException("Tour not found"));
 
-        tour.setStatus(Tour.TourStatus.Active);
+        tour.setStatus(Tour.TourStatus.Postponed);
         tour.setScheduledTime(null);
         tour.setUpdatedAt(LocalDateTime.now());
         tourRepository.save(tour);

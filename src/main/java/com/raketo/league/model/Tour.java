@@ -40,5 +40,5 @@ public class Tour {
     @JoinColumn(name = "responsible_player_id")
     private Player responsiblePlayer;
 
-    public enum TourStatus { Active, Scheduled, Walkover, Completed, Cancelled }
+    public enum TourStatus { Active, Scheduled, Walkover, Postponed, Completed, Cancelled }
 }

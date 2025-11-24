@@ -194,6 +194,7 @@ schedule:
     line: "Tour {0} ({1}-{2}) - {3}"
     number: "Tour {0}"
     dates: "📅 {0}-{1}"
+    status: "Status: {0}"
     opponent_name: "Opponent: {0}"
     availability: "Availability:"
     you: "  You: {0}"
@@ -209,6 +210,13 @@ schedule:
   bye: "Bye"
 
 tour:
+  statuses:
+    Active: "Active"
+    Scheduled: "Scheduled"
+    Walkover: "Walkover"
+    Postponed: "Postponed"
+    Completed: "Completed"
+    Cancelled: "Cancelled"
   not:
     found: "Tour not found"
   manage:
@@ -244,7 +252,7 @@ tour:
     confirmation: "⚠️ Are you sure you want to postpone this tour?\n\nThis action will reset the tour status and cancel all accepted requests. Availability will be preserved."
     confirm: "✅ Yes, postpone"
     cancel: "❌ Cancel"
-    success: "✅ Tour postponed. Status reset to Active."
+    success: "✅ Tour postponed."
     failed: "❌ Failed to postpone tour: {0}"
 
 config:

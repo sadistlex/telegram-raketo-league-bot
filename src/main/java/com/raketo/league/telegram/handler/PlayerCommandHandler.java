@@ -281,6 +281,11 @@ public class PlayerCommandHandler {
                     opponent = localizationService.msg(player, "schedule.bye");
                 }
                 sb.append(localizationService.msg(player, "schedule.tour.number", tourNumber)).append("\n");
+                if (ti.status() != null) {
+                    String statusKey = "tour.statuses." + ti.status().name();
+                    String localizedStatus = localizationService.msg(player, statusKey);
+                    sb.append(localizationService.msg(player, "schedule.tour.status", localizedStatus)).append("\n");
+                }
                 sb.append(localizationService.msg(player, "schedule.tour.dates", start, end)).append("\n");
                 sb.append(localizationService.msg(player, "schedule.tour.opponent_name", opponent)).append("\n");
 
@@ -600,7 +605,13 @@ public class PlayerCommandHandler {
             message.append("\n").append(localizationService.msg(player, "tour.manage.scheduled", timeFmt.format(tourInfo.scheduledTime()))).append("\n");
         }
 
-        message.append("\n").append(localizationService.msg(player, "tour.manage.status", tourInfo.status()));
+        if (tourInfo.status() != null) {
+            String statusKey = "tour.statuses." + tourInfo.status().name();
+            String localizedStatus = localizationService.msg(player, statusKey);
+            message.append("\n").append(localizationService.msg(player, "tour.manage.status", localizedStatus));
+        } else {
+            message.append("\n").append(localizationService.msg(player, "tour.manage.status", ""));
+        }
 
         List<List<InlineKeyboardButton>> keyboard = new ArrayList<>();
 
