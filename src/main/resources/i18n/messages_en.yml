@@ -43,6 +43,7 @@ player:
       header: "🎾 Set Your Preferred Courts\n\nSelect courts in order of preference.\nClick 'Finish' when done.\n\nCurrent order:"
       none: "\n(none selected yet)"
       finish_button: "✅ Finish"
+      reset_button: "♻️ Reset"
       other: "Other"
       saved: "✅ Preferred courts saved!"
       opponent: "Opponent's preferred courts: {0}"

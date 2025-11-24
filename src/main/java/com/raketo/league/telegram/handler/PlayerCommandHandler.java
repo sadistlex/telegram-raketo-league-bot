@@ -83,8 +83,20 @@ public class PlayerCommandHandler {
             } else if ("PLAYER_COURTS".equals(callbackData)) {
                 handleCourtsSetup(chatId, player, bot);
             } else if (callbackData.startsWith("COURT_SELECT_")) {
+                if (player == null) {
+                    bot.sendMessage(chatId, localizationService.resolve(Language.RU, "player.not.registered"));
+                    return;
+                }
                 String court = callbackData.substring("COURT_SELECT_".length());
                 handleCourtSelection(chatId, player, court, bot);
+            } else if ("COURT_RESET".equals(callbackData)) {
+                if (player == null) {
+                    bot.sendMessage(chatId, localizationService.resolve(Language.RU, "player.not.registered"));
+                    return;
+                }
+                playerService.updatePreferredCourts(player, "");
+                Player reloaded = playerService.findById(player.getId()).orElse(player);
+                showCourtsSelectionScreen(chatId, reloaded, bot);
             } else if ("COURT_FINISH".equals(callbackData)) {
                 handleCourtFinish(chatId, player, bot);
             } else if ("PLAYER_MENU".equals(callbackData)) {
@@ -859,6 +871,12 @@ public class PlayerCommandHandler {
                     .build();
             keyboard.add(List.of(courtBtn));
         }
+
+        InlineKeyboardButton resetBtn = InlineKeyboardButton.builder()
+                .text(localizationService.msg(player, "player.courts.setup.reset_button"))
+                .callbackData("COURT_RESET")
+                .build();
+        keyboard.add(List.of(resetBtn));
 
         InlineKeyboardButton finishBtn = InlineKeyboardButton.builder()
                 .text(localizationService.msg(player, "player.courts.setup.finish_button"))
