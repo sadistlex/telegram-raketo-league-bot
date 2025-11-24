@@ -150,10 +150,19 @@ public class TourService {
 
     private Map<String, Long> persistTours(List<TourTemplate> templates, List<List<PlayerPair>> schedule) {
         Map<String, Long> map = new HashMap<>();
+        Map<Long, Integer> responsibilityCount = new HashMap<>();
+
         for (int i = 0; i < schedule.size(); i++) {
             TourTemplate template = templates.get(i);
             for (PlayerPair pair : schedule.get(i)) {
-                Tour tour = Tour.builder().tourTemplate(template).status(Tour.TourStatus.Active).updatedAt(LocalDateTime.now()).build();
+                Player responsible = selectResponsiblePlayer(pair.player1, pair.player2, responsibilityCount);
+
+                Tour tour = Tour.builder()
+                        .tourTemplate(template)
+                        .status(Tour.TourStatus.Active)
+                        .responsiblePlayer(responsible)
+                        .updatedAt(LocalDateTime.now())
+                        .build();
                 Tour saved = tourRepository.save(tour);
                 tourPlayerRepository.save(TourPlayer.builder().tour(saved).player(pair.player1).build());
                 tourPlayerRepository.save(TourPlayer.builder().tour(saved).player(pair.player2).build());
@@ -161,6 +170,23 @@ public class TourService {
             }
         }
         return map;
+    }
+
+    private Player selectResponsiblePlayer(Player p1, Player p2, Map<Long, Integer> responsibilityCount) {
+        int p1Count = responsibilityCount.getOrDefault(p1.getId(), 0);
+        int p2Count = responsibilityCount.getOrDefault(p2.getId(), 0);
+
+        Player responsible;
+        if (p1Count < p2Count) {
+            responsible = p1;
+        } else if (p2Count < p1Count) {
+            responsible = p2;
+        } else {
+            responsible = new Random().nextBoolean() ? p1 : p2;
+        }
+
+        responsibilityCount.put(responsible.getId(), responsibilityCount.getOrDefault(responsible.getId(), 0) + 1);
+        return responsible;
     }
 
     private int preserveAvailability(Map<Long, List<AvailabilitySlot>> oldAvailabilities, List<Tour> oldTours, List<TourTemplate> newTemplates, List<List<PlayerPair>> schedule, Map<String, Long> tourIdByKey, List<Player> newPlayers) {

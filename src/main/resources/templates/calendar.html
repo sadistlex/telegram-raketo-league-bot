@@ -74,6 +74,7 @@
             justify-content: space-between;
             align-items: center;
             margin-bottom: 16px;
+            gap: 8px;
         }
 
         .week-selector button {
@@ -83,11 +84,46 @@
             border: none;
             border-radius: 4px;
             cursor: pointer;
+            font-size: 12px;
         }
 
         .week-selector button:disabled {
             opacity: 0.5;
             cursor: not-allowed;
+        }
+
+        .week-selector span {
+            font-size: 12px;
+            text-align: center;
+        }
+
+        .day-nav {
+            display: none;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            gap: 8px;
+        }
+
+        .day-nav button {
+            padding: 8px 12px;
+            background-color: var(--tg-theme-button-color, #007bff);
+            color: var(--tg-theme-button-text-color, #ffffff);
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .day-nav button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .day-nav span {
+            font-size: 14px;
+            font-weight: bold;
+            text-align: center;
         }
 
         .calendar-grid {
@@ -98,7 +134,6 @@
         .calendar-table {
             width: 100%;
             border-collapse: collapse;
-            min-width: 600px;
         }
 
         .calendar-table th {
@@ -110,11 +145,11 @@
         }
 
         .calendar-table td.time-label {
-            padding: 8px 4px;
-            font-size: 11px;
+            padding: 4px 2px;
+            font-size: 10px;
             text-align: right;
             color: #666;
-            width: 80px;
+            width: 60px;
             position: sticky;
             left: 0;
             background-color: var(--tg-theme-secondary-bg-color, #f5f5f5);
@@ -126,6 +161,36 @@
             left: 0;
             background-color: var(--tg-theme-secondary-bg-color, #f5f5f5);
             z-index: 11;
+            width: 60px;
+        }
+
+        .calendar-table td.hour-control {
+            padding: 0;
+            width: 30px;
+            position: sticky;
+            right: 0;
+            background-color: var(--tg-theme-secondary-bg-color, #f5f5f5);
+            z-index: 10;
+        }
+
+        .calendar-table th.hour-control-header {
+            position: sticky;
+            right: 0;
+            background-color: var(--tg-theme-secondary-bg-color, #f5f5f5);
+            z-index: 11;
+            width: 30px;
+        }
+
+        .hour-btn {
+            width: 100%;
+            height: 30px;
+            padding: 2px;
+            background-color: var(--tg-theme-button-color, #007bff);
+            color: var(--tg-theme-button-text-color, #ffffff);
+            border: 1px solid #ddd;
+            cursor: pointer;
+            font-size: 16px;
+            line-height: 1;
         }
 
         .time-slot {
@@ -134,7 +199,7 @@
             border: 1px solid #ddd;
             cursor: pointer;
             background-color: #fff;
-            transition: background-color 0.2s;
+            transition: background-color 0.1s;
         }
 
         .time-slot.green {
@@ -147,40 +212,6 @@
 
         .time-slot.red {
             background-color: #f44336;
-        }
-
-        .controls {
-            display: flex;
-            gap: 8px;
-            margin-bottom: 16px;
-        }
-
-        .controls button {
-            flex: 1;
-            padding: 12px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: bold;
-        }
-
-        .controls button.green {
-            background-color: #4caf50;
-            color: white;
-        }
-
-        .controls button.yellow {
-            background-color: #ffeb3b;
-            color: black;
-        }
-
-        .controls button.red {
-            background-color: #f44336;
-            color: white;
-        }
-
-        .controls button.active {
-            box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.3);
         }
 
         .save-button {
@@ -199,6 +230,33 @@
             text-align: center;
             padding: 20px;
         }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 8px;
+            }
+
+            .header h1 {
+                font-size: 18px;
+            }
+
+            .day-nav {
+                display: flex;
+            }
+
+            .calendar-table {
+                min-width: auto;
+            }
+
+            .calendar-table td.time-label {
+                font-size: 9px;
+                width: 50px;
+            }
+
+            .calendar-table th.time-header {
+                width: 50px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -213,11 +271,6 @@
         <div class="legend-item"><div class="legend-color red"></div><span th:text="#{web.calendar.legend.busy}">Busy</span></div>
     </div>
 
-    <div class="controls">
-        <button class="green" id="btn-green" th:text="#{web.calendar.controls.available}">Available</button>
-        <button class="red" id="btn-red" th:text="#{web.calendar.controls.busy}">Busy</button>
-    </div>
-
     <div style="margin-bottom: 16px; text-align: center;">
         <button id="toggle-early-hours" style="padding: 8px 16px; background-color: var(--tg-theme-button-color, #007bff); color: var(--tg-theme-button-text-color, #ffffff); border: none; border-radius: 4px; cursor: pointer;" th:text="#{web.calendar.toggle.show}">Show 00:00-07:00</button>
     </div>
@@ -227,6 +280,13 @@
             <button id="prev-week" th:text="#{web.calendar.week.previous}">← Previous</button>
             <span id="week-display">Loading...</span>
             <button id="next-week" th:text="#{web.calendar.week.next}">Next →</button>
+        </div>
+
+        <div class="day-nav">
+            <button id="prev-day">←</button>
+            <span id="day-display">Loading...</span>
+            <button id="next-day">→</button>
+            <button id="show-all-days">Show Week</button>
         </div>
 
         <div class="calendar-grid">
@@ -262,13 +322,14 @@
             document.getElementById('week-display').textContent = 'Error: Missing data';
         }
 
-        let currentMode = 'green';
         let slots = {};
         let currentWeekStart = new Date();
         let weekDates = [];
         let isDragging = false;
-        let dragAction = null;
         let showEarlyHours = false;
+        let isMobileView = window.innerWidth <= 768;
+        let currentDayIndex = 0;
+        let showAllDays = !isMobileView;
 
         const startHour = 0;
         const endHour = 23;
@@ -278,32 +339,49 @@
         const tourStart = tourStartDate ? new Date(tourStartDate) : null;
         const tourEnd = tourEndDate ? new Date(tourEndDate) : null;
 
-        document.getElementById('btn-green').addEventListener('click', () => setMode('green'));
-        document.getElementById('btn-red').addEventListener('click', () => setMode('red'));
         document.getElementById('prev-week').addEventListener('click', () => changeWeek(-1));
         document.getElementById('next-week').addEventListener('click', () => changeWeek(1));
+        document.getElementById('prev-day').addEventListener('click', () => changeDay(-1));
+        document.getElementById('next-day').addEventListener('click', () => changeDay(1));
+        document.getElementById('show-all-days').addEventListener('click', toggleShowAllDays);
         document.getElementById('toggle-early-hours').addEventListener('click', toggleEarlyHours);
 
         document.addEventListener('mouseup', () => {
             isDragging = false;
-            dragAction = null;
         });
         document.addEventListener('touchend', () => {
             isDragging = false;
-            dragAction = null;
         });
+
+        window.addEventListener('resize', () => {
+            const newIsMobile = window.innerWidth <= 768;
+            if (newIsMobile !== isMobileView) {
+                isMobileView = newIsMobile;
+                if (!isMobileView) {
+                    showAllDays = true;
+                }
+                renderCalendar();
+            }
+        });
+
+        function toggleShowAllDays() {
+            showAllDays = !showAllDays;
+            document.getElementById('show-all-days').textContent = showAllDays ? 'Show 1-2 Days' : 'Show Week';
+            renderCalendar();
+        }
+
+        function changeDay(offset) {
+            currentDayIndex += offset;
+            if (currentDayIndex < 0) currentDayIndex = 0;
+            if (currentDayIndex >= weekDates.length) currentDayIndex = weekDates.length - 1;
+            renderCalendar();
+        }
 
         function toggleEarlyHours() {
             showEarlyHours = !showEarlyHours;
             const btn = document.getElementById('toggle-early-hours');
             btn.textContent = showEarlyHours ? MSG_TOGGLE_HIDE : MSG_TOGGLE_SHOW;
             renderCalendar();
-        }
-
-        function setMode(m){
-            currentMode = m;
-            document.querySelectorAll('.controls button').forEach(b => b.classList.remove('active'));
-            document.getElementById(`btn-${m}`).classList.add('active');
         }
 
         function changeWeek(o){
@@ -337,6 +415,43 @@
             return `${day}.${month}`;
         }
 
+        function getDateKey(date) {
+            const d = new Date(date);
+            d.setHours(0, 0, 0, 0);
+            return `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth()+1).padStart(2, '0')}-${d.getFullYear()}`;
+        }
+
+        function getSlotKey(date, hour) {
+            const d = new Date(date);
+            d.setHours(hour, 0, 0, 0);
+            return d.toISOString();
+        }
+
+        function cycleColor(currentColor) {
+            if (currentColor === 'green') return 'red';
+            if (currentColor === 'red') return 'yellow';
+            return 'green';
+        }
+
+        function fillDay(date, mode) {
+            for (let hour = 0; hour <= 23; hour++) {
+                const key = getSlotKey(date, hour);
+                slots[key] = mode;
+            }
+            renderCalendar();
+        }
+
+        function fillHour(hour, mode) {
+            weekDates.forEach(date => {
+                const key = getSlotKey(date, hour);
+                slots[key] = mode;
+            });
+            renderCalendar();
+        }
+
+        window.fillDay = fillDay;
+        window.fillHour = fillHour;
+
         function setPresetTimes() {
             const now = new Date();
             if (tourStart) {
@@ -345,10 +460,7 @@
 
             for (let d = new Date(tourStart); d <= tourEnd; d.setDate(d.getDate() + 1)) {
                 for (let hour = 0; hour <= 23; hour++) {
-                    const slotDate = new Date(d);
-                    slotDate.setHours(hour, 0, 0, 0);
-                    const key = slotDate.toISOString();
-
+                    const key = getSlotKey(d, hour);
                     if ((hour >= 22 && hour <= 23) || (hour >= 0 && hour <= 10)) {
                         slots[key] = 'red';
                     } else if (hour >= 11 && hour <= 21) {
@@ -357,18 +469,6 @@
                 }
             }
         }
-
-        function fillDay(date, mode) {
-            for (let hour = 0; hour <= 23; hour++) {
-                const slotDate = new Date(date);
-                slotDate.setHours(hour, 0, 0, 0);
-                const key = slotDate.toISOString();
-                slots[key] = mode;
-            }
-            renderCalendar();
-        }
-
-        window.fillDay = fillDay;
 
         function renderCalendar(){
             const monday = getMonday(currentWeekStart);
@@ -383,21 +483,40 @@
             const weekDisplay = `${formatDate(weekDates[0])} - ${formatDate(weekDates[6])}`;
             document.getElementById('week-display').textContent = weekDisplay;
 
+            let displayDates = weekDates;
+            if (isMobileView && !showAllDays) {
+                const endIndex = Math.min(currentDayIndex + 2, weekDates.length);
+                displayDates = weekDates.slice(currentDayIndex, endIndex);
+
+                const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+                if (displayDates.length === 1) {
+                    document.getElementById('day-display').textContent =
+                        `${dayNames[displayDates[0].getDay()]} ${formatDate(displayDates[0])}`;
+                } else {
+                    document.getElementById('day-display').textContent =
+                        `${dayNames[displayDates[0].getDay()]} - ${dayNames[displayDates[displayDates.length-1].getDay()]}`;
+                }
+
+                document.getElementById('prev-day').disabled = currentDayIndex === 0;
+                document.getElementById('next-day').disabled = currentDayIndex >= weekDates.length - 1;
+            }
+
             const header = document.getElementById('calendar-header');
             const body = document.getElementById('calendar-body');
 
             let headerHtml = '<tr><th class="time-header"></th>';
-            weekDates.forEach((d, idx) => {
+            displayDates.forEach((d, idx) => {
+                const actualIdx = showAllDays ? idx : currentDayIndex + idx;
                 const dayName = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][d.getDay() === 0 ? 6 : d.getDay()-1];
                 headerHtml += `<th>
                     ${dayName}<br/>${formatDate(d)}<br/>
                     <div style="margin-top: 4px; display: flex; gap: 2px; justify-content: center;">
-                        <button onclick="fillDay(weekDates[${idx}], 'green')" style="padding: 2px 6px; font-size: 10px; background: #4caf50; color: white; border: none; border-radius: 3px; cursor: pointer;">✓</button>
-                        <button onclick="fillDay(weekDates[${idx}], 'red')" style="padding: 2px 6px; font-size: 10px; background: #f44336; color: white; border: none; border-radius: 3px; cursor: pointer;">✗</button>
+                        <button onclick="fillDay(weekDates[${actualIdx}], 'green')" style="padding: 2px 6px; font-size: 10px; background: #4caf50; color: white; border: none; border-radius: 3px; cursor: pointer;">✓</button>
+                        <button onclick="fillDay(weekDates[${actualIdx}], 'red')" style="padding: 2px 6px; font-size: 10px; background: #f44336; color: white; border: none; border-radius: 3px; cursor: pointer;">✗</button>
                     </div>
                 </th>`;
             });
-            headerHtml += '</tr>';
+            headerHtml += '<th class="hour-control-header">All</th></tr>';
             header.innerHTML = headerHtml;
 
             body.innerHTML = '';
@@ -408,62 +527,53 @@
                 const row = document.createElement('tr');
                 const timeCell = document.createElement('td');
                 timeCell.className = 'time-label';
-                timeCell.textContent = `${String(hour).padStart(2, '0')}:00-${String(hour).padStart(2, '0')}:59`;
+                timeCell.textContent = `${String(hour).padStart(2, '0')}:00`;
                 row.appendChild(timeCell);
 
-                weekDates.forEach(date => {
+                displayDates.forEach(date => {
                     const cell = document.createElement('td');
                     const slot = document.createElement('div');
                     slot.className = 'time-slot';
 
-                    const slotDate = new Date(date);
-                    slotDate.setHours(hour, 0, 0, 0);
-                    const key = slotDate.toISOString();
-
-                    if (slots[key]) {
-                        slot.classList.add(slots[key]);
-                    } else {
-                        slot.classList.add('yellow');
-                    }
+                    const key = getSlotKey(date, hour);
+                    const currentColor = slots[key] || 'yellow';
+                    slot.classList.add(currentColor);
 
                     slot.addEventListener('mousedown', (e) => {
                         e.preventDefault();
                         isDragging = true;
-                        if (slots[key] === currentMode) {
-                            dragAction = 'unset';
+                        const newColor = cycleColor(currentColor);
+                        if (newColor === 'yellow') {
                             delete slots[key];
-                            slot.className = 'time-slot yellow';
                         } else {
-                            dragAction = 'set';
-                            slots[key] = currentMode;
-                            slot.className = `time-slot ${currentMode}`;
+                            slots[key] = newColor;
                         }
+                        slot.className = `time-slot ${newColor}`;
                     });
 
                     slot.addEventListener('mouseenter', () => {
                         if (isDragging) {
-                            if (dragAction === 'set') {
-                                slots[key] = currentMode;
-                                slot.className = `time-slot ${currentMode}`;
-                            } else if (dragAction === 'unset') {
+                            const currentSlotColor = slots[key] || 'yellow';
+                            const newColor = cycleColor(currentSlotColor);
+                            if (newColor === 'yellow') {
                                 delete slots[key];
-                                slot.className = 'time-slot yellow';
+                            } else {
+                                slots[key] = newColor;
                             }
+                            slot.className = `time-slot ${newColor}`;
                         }
                     });
 
                     slot.addEventListener('touchstart', (e) => {
                         e.preventDefault();
                         isDragging = true;
-                        if (slots[key] === currentMode) {
-                            dragAction = 'unset';
+                        const newColor = cycleColor(currentColor);
+                        if (newColor === 'yellow') {
                             delete slots[key];
-                            slot.className = 'time-slot yellow';
                         } else {
-                            dragAction = 'set';
-                            slots[key] = currentMode;
-                            slot.className = `time-slot ${currentMode}`;
+                            slots[key] = newColor;
                         }
+                        slot.className = `time-slot ${newColor}`;
                     });
 
                     slot.addEventListener('touchmove', (e) => {
@@ -475,21 +585,21 @@
                                 const rowEl = parent.parentElement;
                                 const cellIndex = Array.from(rowEl.children).indexOf(parent) - 1;
                                 const rowIndex = Array.from(rowEl.parentElement.children).indexOf(rowEl);
+                                const displayStartHourCalc = showEarlyHours ? startHour : visibleStartHour;
 
-                                if (cellIndex >= 0 && cellIndex < weekDates.length && rowIndex >= 0) {
-                                    const touchDate = weekDates[cellIndex];
-                                    const touchHour = startHour + rowIndex;
-                                    const touchSlotDate = new Date(touchDate);
-                                    touchSlotDate.setHours(touchHour, 0, 0, 0);
-                                    const touchKey = touchSlotDate.toISOString();
+                                if (cellIndex >= 0 && cellIndex < displayDates.length && rowIndex >= 0) {
+                                    const touchDate = displayDates[cellIndex];
+                                    const touchHour = displayStartHourCalc + rowIndex;
+                                    const touchKey = getSlotKey(touchDate, touchHour);
+                                    const touchCurrentColor = slots[touchKey] || 'yellow';
+                                    const touchNewColor = cycleColor(touchCurrentColor);
 
-                                    if (dragAction === 'set') {
-                                        slots[touchKey] = currentMode;
-                                        element.className = `time-slot ${currentMode}`;
-                                    } else if (dragAction === 'unset') {
+                                    if (touchNewColor === 'yellow') {
                                         delete slots[touchKey];
-                                        element.className = 'time-slot yellow';
+                                    } else {
+                                        slots[touchKey] = touchNewColor;
                                     }
+                                    element.className = `time-slot ${touchNewColor}`;
                                 }
                             }
                         }
@@ -498,6 +608,21 @@
                     cell.appendChild(slot);
                     row.appendChild(cell);
                 });
+
+                const hourControlCell = document.createElement('td');
+                hourControlCell.className = 'hour-control';
+                const hourBtn = document.createElement('button');
+                hourBtn.className = 'hour-btn';
+                hourBtn.textContent = '↔';
+                hourBtn.title = 'Cycle this hour for all days';
+                hourBtn.onclick = () => {
+                    const firstDayKey = getSlotKey(weekDates[0], hour);
+                    const currentHourColor = slots[firstDayKey] || 'yellow';
+                    const newHourColor = cycleColor(currentHourColor);
+                    fillHour(hour, newHourColor);
+                };
+                hourControlCell.appendChild(hourBtn);
+                row.appendChild(hourControlCell);
 
                 body.appendChild(row);
             }
@@ -555,18 +680,27 @@
                 Object.entries(a).forEach(([day, hours]) => {
                     hours.forEach(h => {
                         const parts = day.split('-');
-                        const d = new Date(`${parts[2]}-${parts[1]}-${parts[0]}T${String(h).padStart(2, '0')}:00:00Z`);
-                        slots[d.toISOString()] = 'green';
+                        const year = parts[2];
+                        const month = parts[1];
+                        const dayNum = parts[0];
+                        const d = new Date(year, month - 1, dayNum);
+                        const key = getSlotKey(d, h);
+                        slots[key] = 'green';
                     });
                 });
                 const u = unavailJson ? JSON.parse(unavailJson) : {};
                 Object.entries(u).forEach(([day, hours]) => {
                     hours.forEach(h => {
                         const parts = day.split('-');
-                        const d = new Date(`${parts[2]}-${parts[1]}-${parts[0]}T${String(h).padStart(2, '0')}:00:00Z`);
-                        slots[d.toISOString()] = 'red';
+                        const year = parts[2];
+                        const month = parts[1];
+                        const dayNum = parts[0];
+                        const d = new Date(year, month - 1, dayNum);
+                        const key = getSlotKey(d, h);
+                        slots[key] = 'red';
                     });
                 });
+                console.log('Loaded slots:', Object.keys(slots).length);
             } catch (e) {
                 console.error('parse error', e);
             }
@@ -597,6 +731,8 @@
             Object.values(availableMap).forEach(arr => arr.sort((a, b) => a - b));
             Object.values(unavailableMap).forEach(arr => arr.sort((a, b) => a - b));
 
+            console.log('Saving availability:', { availableMap, unavailableMap });
+
             try {
                 const res = await fetch(`/api/availability/tour/${tourId}/player/${playerId}`, {
                     method: 'POST',
@@ -620,7 +756,6 @@
         if (tourStartDate) currentWeekStart = new Date(tourStartDate);
 
         if (playerId && tourId && tourStartDate && tourEndDate) {
-            setMode('green');
             loadExisting().then((hasData) => {
                 console.log('Load existing completed, hasData:', hasData);
                 if (!hasData) {

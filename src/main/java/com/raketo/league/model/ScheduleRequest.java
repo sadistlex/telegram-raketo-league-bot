@@ -35,7 +35,7 @@ public class ScheduleRequest {
     private Player recipientPlayer;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, length = 20)
     @Builder.Default
     private ScheduleStatus status = ScheduleStatus.Pending;
 

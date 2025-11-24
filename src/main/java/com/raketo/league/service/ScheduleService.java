@@ -16,7 +16,6 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ScheduleService {
     private final TourPlayerRepository tourPlayerRepository;
-    private final AvailabilitySlotRepository availabilitySlotRepository;
     private final PlayerDivisionAssignmentRepository playerDivisionAssignmentRepository;
     private final TourTemplateRepository tourTemplateRepository;
     public static final ZoneId ZONE_ID = ZoneId.of("Asia/Tbilisi");
@@ -27,6 +26,20 @@ public class ScheduleService {
         List<PlayerDivisionAssignment> assignments = playerDivisionAssignmentRepository.findByPlayerId(player.getId());
         if (assignments.isEmpty()) { return new PlayerSchedule(player, List.of()); }
         Set<Long> divisionTournamentIds = assignments.stream().map(a -> a.getDivisionTournament().getId()).collect(Collectors.toSet());
+        return buildPlayerScheduleForDivisions(player, divisionTournamentIds);
+    }
+
+    @Transactional(readOnly = true)
+    public PlayerSchedule buildPlayerScheduleForDivision(Player player, Long divisionTournamentId) {
+        return buildPlayerScheduleForDivisions(player, Set.of(divisionTournamentId));
+    }
+
+    @Transactional(readOnly = true)
+    public List<PlayerDivisionAssignment> getPlayerDivisions(Player player) {
+        return playerDivisionAssignmentRepository.findByPlayerId(player.getId());
+    }
+
+    private PlayerSchedule buildPlayerScheduleForDivisions(Player player, Set<Long> divisionTournamentIds) {
         List<TourTemplate> allTemplates = new ArrayList<>();
         for (Long dtId : divisionTournamentIds) { allTemplates.addAll(tourTemplateRepository.findByDivisionTournamentId(dtId)); }
         allTemplates.sort(Comparator.comparing(TourTemplate::getStartDate));
@@ -48,11 +61,12 @@ public class ScheduleService {
             Long tourId = tour != null ? tour.getId() : null;
             Tour.TourStatus status = tour != null ? tour.getStatus() : null;
             LocalDateTime scheduledTime = tour != null ? tour.getScheduledTime() : null;
-            tourInfos.add(new TourInfo(tourId, template.getStartDate(), template.getEndDate(), status, opponent, scheduledTime));
+            Player responsiblePlayer = tour != null ? tour.getResponsiblePlayer() : null;
+            tourInfos.add(new TourInfo(tourId, template.getStartDate(), template.getEndDate(), status, opponent, scheduledTime, responsiblePlayer));
         }
         return new PlayerSchedule(player, tourInfos);
     }
 
     public record PlayerSchedule(Player player, List<TourInfo> tours) {}
-    public record TourInfo(Long tourId, LocalDateTime startDate, LocalDateTime endDate, Tour.TourStatus status, Player opponent, LocalDateTime scheduledTime) {}
+    public record TourInfo(Long tourId, LocalDateTime startDate, LocalDateTime endDate, Tour.TourStatus status, Player opponent, LocalDateTime scheduledTime, Player responsiblePlayer) {}
 }

@@ -79,4 +79,10 @@ public class PlayerService {
         player.setLanguage(language);
         playerRepository.save(player);
     }
+
+    @Transactional
+    public void updatePreferredCourts(Player player, String preferredCourts) {
+        player.setPreferredCourts(preferredCourts);
+        playerRepository.save(player);
+    }
 }

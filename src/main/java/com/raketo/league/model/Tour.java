@@ -21,7 +21,7 @@ public class Tour {
     private TourTemplate tourTemplate;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, length = 20)
     @Builder.Default
     private TourStatus status = TourStatus.Active;
 
@@ -33,6 +33,10 @@ public class Tour {
 
     @Column(name = "complete_date")
     private LocalDateTime completeDate;
+
+    @ManyToOne
+    @JoinColumn(name = "responsible_player_id")
+    private Player responsiblePlayer;
 
     public enum TourStatus { Active, Scheduled, Walkover, Completed, Cancelled }
 }

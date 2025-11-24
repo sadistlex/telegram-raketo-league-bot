@@ -31,4 +31,7 @@ public class Player {
     @Column(name = "language", nullable = false)
     @Builder.Default
     private Language language = Language.RU;
+
+    @Column(name = "preferred_courts", columnDefinition = "TEXT")
+    private String preferredCourts;
 }

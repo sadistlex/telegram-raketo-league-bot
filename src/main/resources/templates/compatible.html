@@ -78,6 +78,7 @@
             justify-content: space-between;
             align-items: center;
             margin-bottom: 16px;
+            gap: 8px;
         }
 
         .week-selector button {
@@ -87,11 +88,46 @@
             border: none;
             border-radius: 4px;
             cursor: pointer;
+            font-size: 12px;
         }
 
         .week-selector button:disabled {
             opacity: 0.5;
             cursor: not-allowed;
+        }
+
+        .week-selector span {
+            font-size: 12px;
+            text-align: center;
+        }
+
+        .day-nav {
+            display: none;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            gap: 8px;
+        }
+
+        .day-nav button {
+            padding: 8px 12px;
+            background-color: var(--tg-theme-button-color, #007bff);
+            color: var(--tg-theme-button-text-color, #ffffff);
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .day-nav button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .day-nav span {
+            font-size: 14px;
+            font-weight: bold;
+            text-align: center;
         }
 
         .calendar-grid {
@@ -102,7 +138,6 @@
         .calendar-table {
             width: 100%;
             border-collapse: collapse;
-            min-width: 600px;
         }
 
         .calendar-table th {
@@ -114,11 +149,11 @@
         }
 
         .calendar-table td.time-label {
-            padding: 8px 4px;
-            font-size: 11px;
+            padding: 4px 2px;
+            font-size: 10px;
             text-align: right;
             color: #666;
-            width: 80px;
+            width: 60px;
             position: sticky;
             left: 0;
             background-color: var(--tg-theme-secondary-bg-color, #f5f5f5);
@@ -130,6 +165,7 @@
             left: 0;
             background-color: var(--tg-theme-secondary-bg-color, #f5f5f5);
             z-index: 11;
+            width: 60px;
         }
 
         .time-slot {
@@ -138,7 +174,7 @@
             border: 1px solid #ddd;
             cursor: pointer;
             background-color: #fff;
-            transition: background-color 0.2s;
+            transition: background-color 0.1s;
         }
 
         .time-slot.green {
@@ -185,6 +221,33 @@
             text-align: center;
             padding: 20px;
         }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 8px;
+            }
+
+            .header h1 {
+                font-size: 18px;
+            }
+
+            .day-nav {
+                display: flex;
+            }
+
+            .calendar-table {
+                min-width: auto;
+            }
+
+            .calendar-table td.time-label {
+                font-size: 9px;
+                width: 50px;
+            }
+
+            .calendar-table th.time-header {
+                width: 50px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -209,6 +272,13 @@
             <button id="prev-week" th:text="#{web.compatible.week.previous}">← Previous</button>
             <span id="week-display">Loading...</span>
             <button id="next-week" th:text="#{web.compatible.week.next}">Next →</button>
+        </div>
+
+        <div class="day-nav">
+            <button id="prev-day">←</button>
+            <span id="day-display">Loading...</span>
+            <button id="next-day">→</button>
+            <button id="show-all-days">Show Week</button>
         </div>
 
         <div class="calendar-grid">
@@ -252,6 +322,9 @@
         let showEarlyHours = false;
         let isDragging = false;
         let dragAction = null;
+        let isMobileView = window.innerWidth <= 768;
+        let currentDayIndex = 0;
+        let showAllDays = !isMobileView;
 
         const startHour = 0;
         const endHour = 23;
@@ -263,6 +336,9 @@
 
         document.getElementById('prev-week').addEventListener('click', () => changeWeek(-1));
         document.getElementById('next-week').addEventListener('click', () => changeWeek(1));
+        document.getElementById('prev-day').addEventListener('click', () => changeDay(-1));
+        document.getElementById('next-day').addEventListener('click', () => changeDay(1));
+        document.getElementById('show-all-days').addEventListener('click', toggleShowAllDays);
         document.getElementById('toggle-early-hours').addEventListener('click', toggleEarlyHours);
 
         document.addEventListener('mouseup', () => {
@@ -273,6 +349,30 @@
             isDragging = false;
             dragAction = null;
         });
+
+        window.addEventListener('resize', () => {
+            const newIsMobile = window.innerWidth <= 768;
+            if (newIsMobile !== isMobileView) {
+                isMobileView = newIsMobile;
+                if (!isMobileView) {
+                    showAllDays = true;
+                }
+                renderCalendar();
+            }
+        });
+
+        function toggleShowAllDays() {
+            showAllDays = !showAllDays;
+            document.getElementById('show-all-days').textContent = showAllDays ? 'Show 1-2 Days' : 'Show Week';
+            renderCalendar();
+        }
+
+        function changeDay(offset) {
+            currentDayIndex += offset;
+            if (currentDayIndex < 0) currentDayIndex = 0;
+            if (currentDayIndex >= weekDates.length) currentDayIndex = weekDates.length - 1;
+            renderCalendar();
+        }
 
         function toggleEarlyHours() {
             showEarlyHours = !showEarlyHours;
@@ -331,11 +431,29 @@
             const weekDisplay = `${formatDate(weekDates[0])} - ${formatDate(weekDates[6])}`;
             document.getElementById('week-display').textContent = weekDisplay;
 
+            let displayDates = weekDates;
+            if (isMobileView && !showAllDays) {
+                const endIndex = Math.min(currentDayIndex + 2, weekDates.length);
+                displayDates = weekDates.slice(currentDayIndex, endIndex);
+
+                const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+                if (displayDates.length === 1) {
+                    document.getElementById('day-display').textContent =
+                        `${dayNames[displayDates[0].getDay()]} ${formatDate(displayDates[0])}`;
+                } else {
+                    document.getElementById('day-display').textContent =
+                        `${dayNames[displayDates[0].getDay()]} - ${dayNames[displayDates[displayDates.length-1].getDay()]}`;
+                }
+
+                document.getElementById('prev-day').disabled = currentDayIndex === 0;
+                document.getElementById('next-day').disabled = currentDayIndex >= weekDates.length - 1;
+            }
+
             const header = document.getElementById('calendar-header');
             const body = document.getElementById('calendar-body');
 
             let headerHtml = '<tr><th class="time-header"></th>';
-            weekDates.forEach((d) => {
+            displayDates.forEach((d) => {
                 const dayName = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][d.getDay() === 0 ? 6 : d.getDay()-1];
                 headerHtml += `<th>${dayName}<br/>${formatDate(d)}</th>`;
             });
@@ -350,10 +468,10 @@
                 const row = document.createElement('tr');
                 const timeCell = document.createElement('td');
                 timeCell.className = 'time-label';
-                timeCell.textContent = `${String(hour).padStart(2, '0')}:00-${String(hour).padStart(2, '0')}:59`;
+                timeCell.textContent = `${String(hour).padStart(2, '0')}:00`;
                 row.appendChild(timeCell);
 
-                weekDates.forEach(date => {
+                displayDates.forEach(date => {
                     const cell = document.createElement('td');
                     const slot = document.createElement('div');
                     slot.className = 'time-slot';
@@ -423,10 +541,10 @@
                                     const cellIndex = Array.from(rowEl.children).indexOf(parent) - 1;
                                     const rowIndex = Array.from(rowEl.parentElement.children).indexOf(rowEl);
 
-                                    if (cellIndex >= 0 && cellIndex < weekDates.length && rowIndex >= 0) {
-                                        const touchDate = weekDates[cellIndex];
-                                        const displayStartHour = showEarlyHours ? startHour : visibleStartHour;
-                                        const touchHour = displayStartHour + rowIndex;
+                                    if (cellIndex >= 0 && cellIndex < displayDates.length && rowIndex >= 0) {
+                                        const touchDate = displayDates[cellIndex];
+                                        const displayStartHourCalc = showEarlyHours ? startHour : visibleStartHour;
+                                        const touchHour = displayStartHourCalc + rowIndex;
                                         const touchKey = getSlotKey(touchDate, touchHour);
 
                                         if (dragAction === 'select') {
@@ -531,7 +649,11 @@
                 Object.entries(a).forEach(([day, hours]) => {
                     hours.forEach(h => {
                         const parts = day.split('-');
-                        const key = getSlotKey(new Date(`${parts[2]}-${parts[1]}-${parts[0]}`), h);
+                        const year = parts[2];
+                        const month = parts[1];
+                        const dayNum = parts[0];
+                        const d = new Date(year, month - 1, dayNum);
+                        const key = getSlotKey(d, h);
                         result[key] = 'green';
                     });
                 });
@@ -539,7 +661,11 @@
                 Object.entries(u).forEach(([day, hours]) => {
                     hours.forEach(h => {
                         const parts = day.split('-');
-                        const key = getSlotKey(new Date(`${parts[2]}-${parts[1]}-${parts[0]}`), h);
+                        const year = parts[2];
+                        const month = parts[1];
+                        const dayNum = parts[0];
+                        const d = new Date(year, month - 1, dayNum);
+                        const key = getSlotKey(d, h);
                         result[key] = 'red';
                     });
                 });
@@ -593,10 +719,38 @@
                 dayGroups[dayKey].push(hour);
             });
 
-            return Object.entries(dayGroups).map(([day, hours]) => ({
-                day: day,
-                hours: hours.sort((a, b) => a - b)
-            }));
+            const result = [];
+            Object.entries(dayGroups).forEach(([day, hours]) => {
+                hours.sort((a, b) => a - b);
+                const segments = splitIntoContinuousSegments(hours);
+                segments.forEach(segment => {
+                    result.push({
+                        day: day,
+                        hours: segment
+                    });
+                });
+            });
+
+            return result;
+        }
+
+        function splitIntoContinuousSegments(hours) {
+            if (hours.length === 0) return [];
+
+            const segments = [];
+            let currentSegment = [hours[0]];
+
+            for (let i = 1; i < hours.length; i++) {
+                if (hours[i] === hours[i - 1] + 1) {
+                    currentSegment.push(hours[i]);
+                } else {
+                    segments.push([...currentSegment]);
+                    currentSegment = [hours[i]];
+                }
+            }
+            segments.push(currentSegment);
+
+            return segments;
         }
 
         if (tourStartDate) currentWeekStart = new Date(tourStartDate);

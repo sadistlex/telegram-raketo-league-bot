@@ -3,8 +3,10 @@ package com.raketo.league.util;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import java.time.DayOfWeek;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -24,6 +26,12 @@ public class FormatUtils {
     public static String formatDate(java.time.LocalDate date) {
         if (date == null) return "";
         return date.format(DATE_FORMATTER);
+    }
+
+    public static String formatDateWithDay(java.time.LocalDate date) {
+        if (date == null) return "";
+        String dayName = getDayName(date.getDayOfWeek());
+        return String.format("%s (%s)", formatDate(date), dayName);
     }
 
     public static String formatDateTime(LocalDateTime dateTime) {
@@ -46,6 +54,45 @@ public class FormatUtils {
             return OBJECT_MAPPER.writeValueAsString(hours);
         } catch (Exception e) {
             return "[]";
+        }
+    }
+
+    public static List<List<Integer>> splitIntoContinuousSegments(List<Integer> hours) {
+        if (hours == null || hours.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<Integer> sorted = new ArrayList<>(hours);
+        Collections.sort(sorted);
+
+        List<List<Integer>> segments = new ArrayList<>();
+        List<Integer> currentSegment = new ArrayList<>();
+        currentSegment.add(sorted.get(0));
+
+        for (int i = 1; i < sorted.size(); i++) {
+            if (sorted.get(i) == sorted.get(i - 1) + 1) {
+                currentSegment.add(sorted.get(i));
+            } else {
+                segments.add(new ArrayList<>(currentSegment));
+                currentSegment.clear();
+                currentSegment.add(sorted.get(i));
+            }
+        }
+        segments.add(currentSegment);
+
+        return segments;
+    }
+
+    private static String getDayName(DayOfWeek dayOfWeek) {
+        switch (dayOfWeek) {
+            case MONDAY: return "Mon";
+            case TUESDAY: return "Tue";
+            case WEDNESDAY: return "Wed";
+            case THURSDAY: return "Thu";
+            case FRIDAY: return "Fri";
+            case SATURDAY: return "Sat";
+            case SUNDAY: return "Sun";
+            default: return "";
         }
     }
 }

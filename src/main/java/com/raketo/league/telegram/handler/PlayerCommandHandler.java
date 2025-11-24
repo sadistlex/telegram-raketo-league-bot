@@ -60,10 +60,20 @@ public class PlayerCommandHandler {
 
         if ("PLAYER_SCHEDULE_REFRESH".equals(callbackData) || "PLAYER_SCHEDULE".equals(callbackData)) {
             handleSchedule(chatId, userId, username, bot);
+        } else if (callbackData.startsWith("SCHEDULE_DIVISION_")) {
+            Long divisionTournamentId = Long.parseLong(callbackData.substring("SCHEDULE_DIVISION_".length()));
+            handleScheduleForDivision(chatId, userId, username, divisionTournamentId, bot);
         } else if ("PLAYER_HELP".equals(callbackData)) {
             handleHelp(chatId, userId, bot);
         } else if ("PLAYER_CONFIG".equals(callbackData)) {
             sendLanguageConfig(chatId, player, bot);
+        } else if ("PLAYER_COURTS".equals(callbackData)) {
+            handleCourtsSetup(chatId, player, bot);
+        } else if (callbackData.startsWith("COURT_SELECT_")) {
+            String court = callbackData.substring("COURT_SELECT_".length());
+            handleCourtSelection(chatId, player, court, bot);
+        } else if ("COURT_FINISH".equals(callbackData)) {
+            handleCourtFinish(chatId, player, bot);
         } else if ("LANG_RU".equals(callbackData)) {
             if (player != null) {
                 playerService.updateLanguage(player, Language.RU);
@@ -76,15 +86,45 @@ public class PlayerCommandHandler {
             }
             bot.sendMessage(chatId, localizationService.msg(player, "config.language.updated", "English"));
             handleStartCommand(chatId, userId, bot);
+        } else if (callbackData.startsWith("MANAGE_TOUR_")) {
+            Long tourId = Long.parseLong(callbackData.substring("MANAGE_TOUR_".length()));
+            handleManageTour(chatId, userId, username, tourId, bot);
+        } else if (callbackData.startsWith("VIEW_REQUESTS_ACCEPTED_")) {
+            Long tourId = Long.parseLong(callbackData.substring("VIEW_REQUESTS_ACCEPTED_".length()));
+            handleViewRequests(chatId, userId, username, tourId, bot, true);
+        } else if (callbackData.startsWith("VIEW_REQUESTS_ALL_")) {
+            Long tourId = Long.parseLong(callbackData.substring("VIEW_REQUESTS_ALL_".length()));
+            handleViewRequests(chatId, userId, username, tourId, bot, false);
         } else if (callbackData.startsWith("VIEW_REQUESTS_")) {
             Long tourId = Long.parseLong(callbackData.substring("VIEW_REQUESTS_".length()));
-            handleViewRequests(chatId, userId, username, tourId, bot);
+            handleViewRequests(chatId, userId, username, tourId, bot, false);
         } else if (callbackData.startsWith("ACCEPT_REQUEST_")) {
             Long requestId = Long.parseLong(callbackData.substring("ACCEPT_REQUEST_".length()));
             handleAcceptRequest(chatId, userId, username, requestId, bot);
         } else if (callbackData.startsWith("DECLINE_REQUEST_")) {
             Long requestId = Long.parseLong(callbackData.substring("DECLINE_REQUEST_".length()));
             handleDeclineRequest(chatId, userId, username, requestId, bot);
+        } else if (callbackData.startsWith("CANCEL_REQUEST_")) {
+            Long requestId = Long.parseLong(callbackData.substring("CANCEL_REQUEST_".length()));
+            handleCancelRequest(chatId, userId, username, requestId, bot);
+        } else if (callbackData.startsWith("CHANGE_TO_ACCEPT_")) {
+            Long requestId = Long.parseLong(callbackData.substring("CHANGE_TO_ACCEPT_".length()));
+            handleChangeRequestStatus(chatId, userId, username, requestId, ScheduleRequest.ScheduleStatus.Accepted, bot);
+        } else if (callbackData.startsWith("CHANGE_TO_DECLINE_")) {
+            Long requestId = Long.parseLong(callbackData.substring("CHANGE_TO_DECLINE_".length()));
+            handleChangeRequestStatus(chatId, userId, username, requestId, ScheduleRequest.ScheduleStatus.Declined, bot);
+        } else if (callbackData.startsWith("COMPLETE_TOUR_")) {
+            Long tourId = Long.parseLong(callbackData.substring("COMPLETE_TOUR_".length()));
+            handleCompleteTour(chatId, userId, username, tourId, bot);
+        } else if (callbackData.startsWith("POSTPONE_TOUR_")) {
+            Long tourId = Long.parseLong(callbackData.substring("POSTPONE_TOUR_".length()));
+            handlePostponeTour(chatId, userId, username, tourId, bot);
+        } else if (callbackData.startsWith("CONFIRM_COMPLETE_")) {
+            Long tourId = Long.parseLong(callbackData.substring("CONFIRM_COMPLETE_".length()));
+            confirmCompleteTour(chatId, userId, username, tourId, bot);
+        } else if (callbackData.startsWith("CONFIRM_POSTPONE_")) {
+            Long tourId = Long.parseLong(callbackData.substring("CONFIRM_POSTPONE_".length()));
+            confirmPostponeTour(chatId, userId, username, tourId, bot);
         }
     }
 
@@ -111,6 +151,13 @@ public class PlayerCommandHandler {
                 .callbackData("PLAYER_SCHEDULE")
                 .build();
         keyboard.add(List.of(scheduleBtn));
+
+        InlineKeyboardButton courtsBtn = InlineKeyboardButton.builder()
+                .text(localizationService.msg(player, "player.menu.courts_button"))
+                .callbackData("PLAYER_COURTS")
+                .build();
+        keyboard.add(List.of(courtsBtn));
+
         InlineKeyboardButton helpBtn = InlineKeyboardButton.builder()
                 .text(localizationService.msg(player, "player.menu.help_button"))
                 .callbackData("PLAYER_HELP")
@@ -137,13 +184,66 @@ public class PlayerCommandHandler {
             bot.sendMessage(chatId, localizationService.resolve(Language.RU, "player.not.registered"));
             return;
         }
-        ScheduleService.PlayerSchedule ps = scheduleService.buildPlayerSchedule(player);
+
+        List<PlayerDivisionAssignment> divisions = scheduleService.getPlayerDivisions(player);
+
+        if (divisions.size() > 1) {
+            showDivisionSelection(chatId, player, divisions, bot);
+        } else {
+            ScheduleService.PlayerSchedule ps = scheduleService.buildPlayerSchedule(player);
+            String messageText = renderScheduleMessageLocalized(ps, player);
+            SendMessage message = SendMessage.builder().chatId(chatId.toString()).text(messageText).replyMarkup(scheduleKeyboardWithTours(ps, player)).build();
+            try {
+                bot.execute(message);
+            } catch (Exception e) {
+                logger.error("Failed to send schedule", e);
+            }
+        }
+    }
+
+    private void showDivisionSelection(Long chatId, Player player, List<PlayerDivisionAssignment> divisions, TelegramBot bot) {
+        List<List<InlineKeyboardButton>> keyboard = new ArrayList<>();
+
+        for (PlayerDivisionAssignment assignment : divisions) {
+            DivisionTournament dt = assignment.getDivisionTournament();
+            String buttonText = localizationService.msg(player, "player.schedule.division_button",
+                dt.getDivision().getName(),
+                dt.getTournament().getName());
+
+            InlineKeyboardButton divisionBtn = InlineKeyboardButton.builder()
+                    .text(buttonText)
+                    .callbackData("SCHEDULE_DIVISION_" + dt.getId())
+                    .build();
+            keyboard.add(List.of(divisionBtn));
+        }
+
+        SendMessage message = SendMessage.builder()
+                .chatId(chatId.toString())
+                .text(localizationService.msg(player, "player.schedule.select_division"))
+                .replyMarkup(InlineKeyboardMarkup.builder().keyboard(keyboard).build())
+                .build();
+
+        try {
+            bot.execute(message);
+        } catch (Exception e) {
+            logger.error("Failed to send division selection", e);
+        }
+    }
+
+    private void handleScheduleForDivision(Long chatId, Long userId, String username, Long divisionTournamentId, TelegramBot bot) {
+        Player player = playerService.findOrLinkPlayer(userId, username);
+        if (player == null) {
+            bot.sendMessage(chatId, localizationService.resolve(Language.RU, "player.not.registered"));
+            return;
+        }
+
+        ScheduleService.PlayerSchedule ps = scheduleService.buildPlayerScheduleForDivision(player, divisionTournamentId);
         String messageText = renderScheduleMessageLocalized(ps, player);
         SendMessage message = SendMessage.builder().chatId(chatId.toString()).text(messageText).replyMarkup(scheduleKeyboardWithTours(ps, player)).build();
         try {
             bot.execute(message);
         } catch (Exception e) {
-            logger.error("Failed to send schedule", e);
+            logger.error("Failed to send schedule for division", e);
         }
     }
 
@@ -163,7 +263,18 @@ public class PlayerCommandHandler {
                 } else {
                     opponent = localizationService.msg(player, "schedule.bye");
                 }
-                sb.append(localizationService.msg(player, "schedule.tour.line", tourNumber, start, end, opponent));
+                sb.append(localizationService.msg(player, "schedule.tour.number", tourNumber)).append("\n");
+                sb.append(localizationService.msg(player, "schedule.tour.dates", start, end)).append("\n");
+                sb.append(localizationService.msg(player, "schedule.tour.opponent_name", opponent)).append("\n");
+
+                if (ti.opponent() != null && ti.responsiblePlayer() != null) {
+                    if (ti.responsiblePlayer().getId().equals(ps.player().getId())) {
+                        sb.append(localizationService.msg(player, "schedule.tour.responsible.you")).append("\n");
+                    } else {
+                        sb.append(localizationService.msg(player, "schedule.tour.responsible.opponent", ti.responsiblePlayer().getName())).append("\n");
+                    }
+                }
+
                 if (ti.opponent() != null) {
                     List<AvailabilitySlot> playerSlots = availabilityService.getPlayerTourAvailability(ps.player().getId(), ti.tourId()).map(List::of).orElse(List.of());
                     List<AvailabilitySlot> opponentSlots = availabilityService.getPlayerTourAvailability(ti.opponent().getId(), ti.tourId()).map(List::of).orElse(List.of());
@@ -181,9 +292,11 @@ public class PlayerCommandHandler {
                     }
                     if (ti.status() == Tour.TourStatus.Scheduled && ti.scheduledTime() != null) {
                         DateTimeFormatter timeFmt = DateTimeFormatter.ofPattern("dd.MM HH:mm").withZone(java.time.ZoneId.of("Asia/Tbilisi"));
-                        sb.append(" ").append(timeFmt.format(ti.scheduledTime()));
+                        sb.append(localizationService.msg(player, "schedule.tour.scheduled", timeFmt.format(ti.scheduledTime()))).append("\n");
                     } else {
-                        sb.append(localizationService.msg(player, "schedule.availability.status", playerStatus, opponentStatus));
+                        sb.append(localizationService.msg(player, "schedule.tour.availability")).append("\n");
+                        sb.append(localizationService.msg(player, "schedule.tour.you", playerStatus)).append("\n");
+                        sb.append(localizationService.msg(player, "schedule.tour.opponent.status", opponentStatus)).append("\n");
                     }
                 }
                 sb.append("\n");
@@ -199,31 +312,24 @@ public class PlayerCommandHandler {
             int tourNumber = 1;
             for (ScheduleService.TourInfo ti : schedule.tours()) {
                 if (ti.tourId() != null && ti.opponent() != null) {
-                    List<InlineKeyboardButton> row = new ArrayList<>();
-                    InlineKeyboardButton availabilityBtn = InlineKeyboardButton.builder()
-                            .text(localizationService.msg(player, "player.schedule.set_availability", tourNumber))
-                            .webApp(new WebAppInfo(baseUrl + "/webapp/calendar?playerId=" + schedule.player().getTelegramId() + "&tourId=" + ti.tourId()))
-                            .build();
-                    row.add(availabilityBtn);
-                    keyboard.add(row);
-                    boolean playerHasAvailability = availabilityService.getPlayerTourAvailability(schedule.player().getId(), ti.tourId()).isPresent();
-                    boolean opponentHasAvailability = availabilityService.getPlayerTourAvailability(ti.opponent().getId(), ti.tourId()).isPresent();
-                    List<InlineKeyboardButton> actionsRow = new ArrayList<>();
-                    if (playerHasAvailability && opponentHasAvailability) {
-                        InlineKeyboardButton compatibleTimesBtn = InlineKeyboardButton.builder()
-                                .text(localizationService.msg(player, "player.schedule.compatible_times", tourNumber))
-                                .webApp(new WebAppInfo(baseUrl + "/webapp/compatible?playerId=" + schedule.player().getId() + "&opponentId=" + ti.opponent().getId() + "&tourId=" + ti.tourId()))
-                                .build();
-                        actionsRow.add(compatibleTimesBtn);
+                    List<ScheduleRequest> tourRequests = scheduleRequestService.getTourRequests(ti.tourId(), schedule.player().getId());
+                    long incomingPending = tourRequests.stream()
+                            .filter(r -> r.getRecipientPlayer().getId().equals(schedule.player().getId()) && r.getStatus() == ScheduleRequest.ScheduleStatus.Pending)
+                            .count();
+                    long outgoingPending = tourRequests.stream()
+                            .filter(r -> r.getInitiatorPlayer().getId().equals(schedule.player().getId()) && r.getStatus() == ScheduleRequest.ScheduleStatus.Pending)
+                            .count();
+
+                    String buttonText = localizationService.msg(player, "player.schedule.manage_tour", tourNumber);
+                    if (incomingPending > 0 || outgoingPending > 0) {
+                        buttonText += " " + localizationService.msg(player, "player.schedule.requests_count", incomingPending, outgoingPending);
                     }
-                    InlineKeyboardButton requestsBtn = InlineKeyboardButton.builder()
-                            .text(localizationService.msg(player, "player.schedule.view_requests", tourNumber))
-                            .callbackData("VIEW_REQUESTS_" + ti.tourId())
+
+                    InlineKeyboardButton manageTourBtn = InlineKeyboardButton.builder()
+                            .text(buttonText)
+                            .callbackData("MANAGE_TOUR_" + ti.tourId())
                             .build();
-                    actionsRow.add(requestsBtn);
-                    if (!actionsRow.isEmpty()) {
-                        keyboard.add(actionsRow);
-                    }
+                    keyboard.add(List.of(manageTourBtn));
                 }
                 tourNumber++;
             }
@@ -241,8 +347,9 @@ public class PlayerCommandHandler {
         Player player = playerService.findByTelegramId(userId).orElse(null);
         StringBuilder helpMessage = new StringBuilder();
         helpMessage.append(localizationService.msg(player, "player.help.header"));
-        helpMessage.append(localizationService.msg(player, "player.help.schedule", BotCommand.SCHEDULE.getCommand())).append("\n");
-        helpMessage.append(localizationService.msg(player, "player.help.help", BotCommand.HELP.getCommand())).append("\n");
+        helpMessage.append(localizationService.msg(player, "player.help.schedule", BotCommand.SCHEDULE.getCommand()));
+        helpMessage.append(localizationService.msg(player, "player.help.help", BotCommand.HELP.getCommand()));
+        helpMessage.append(localizationService.msg(player, "player.help.features"));
         if (isAdmin) {
             helpMessage.append(localizationService.msg(player, "player.help.admin.header"));
             helpMessage.append(BotCommand.ADMIN.getCommand()).append(" - /admin\n");
@@ -250,31 +357,68 @@ public class PlayerCommandHandler {
         bot.sendMessage(chatId, helpMessage.toString());
     }
 
-    private void handleViewRequests(Long chatId, Long userId, String username, Long tourId, TelegramBot bot) {
+    private void handleViewRequests(Long chatId, Long userId, String username, Long tourId, TelegramBot bot, boolean acceptedOnly) {
         Player player = playerService.findOrLinkPlayer(userId, username);
         if (player == null) {
             bot.sendMessage(chatId, localizationService.resolve(Language.RU, "player.not.registered"));
             return;
         }
         List<ScheduleRequest> requests = scheduleRequestService.getTourRequests(tourId, player.getId());
+
+        if (acceptedOnly) {
+            requests = requests.stream()
+                    .filter(r -> r.getStatus() == ScheduleRequest.ScheduleStatus.Accepted)
+                    .toList();
+        }
+
         String messageText = scheduleRequestService.formatRequestsMessageLocalized(requests, player, localizationService);
         List<List<InlineKeyboardButton>> keyboard = new ArrayList<>();
+
         for (ScheduleRequest req : requests) {
-            if (req.getRecipientPlayer().getId().equals(player.getId()) && req.getStatus() == ScheduleRequest.ScheduleStatus.Pending) {
-                List<InlineKeyboardButton> row = new ArrayList<>();
-                InlineKeyboardButton acceptBtn = InlineKeyboardButton.builder()
-                        .text(localizationService.msg(player, "player.requests.accept_button", req.getId()))
-                        .callbackData("ACCEPT_REQUEST_" + req.getId())
-                        .build();
-                row.add(acceptBtn);
-                InlineKeyboardButton declineBtn = InlineKeyboardButton.builder()
-                        .text(localizationService.msg(player, "player.requests.decline_button", req.getId()))
-                        .callbackData("DECLINE_REQUEST_" + req.getId())
-                        .build();
-                row.add(declineBtn);
-                keyboard.add(row);
+            List<Integer> hours = com.raketo.league.util.FormatUtils.parseHoursFromJson(req.getProposedHours());
+            String timeLabel = com.raketo.league.util.FormatUtils.formatDateWithDay(req.getProposedDate());
+            if (!hours.isEmpty()) {
+                timeLabel += " " + com.raketo.league.util.FormatUtils.formatHours(hours);
+            }
+
+            if (req.getRecipientPlayer().getId().equals(player.getId())) {
+                if (req.getStatus() == ScheduleRequest.ScheduleStatus.Pending) {
+                    List<InlineKeyboardButton> row = new ArrayList<>();
+                    InlineKeyboardButton acceptBtn = InlineKeyboardButton.builder()
+                            .text(localizationService.msg(player, "player.requests.accept_button", timeLabel))
+                            .callbackData("ACCEPT_REQUEST_" + req.getId())
+                            .build();
+                    row.add(acceptBtn);
+                    InlineKeyboardButton declineBtn = InlineKeyboardButton.builder()
+                            .text(localizationService.msg(player, "player.requests.decline_button", timeLabel))
+                            .callbackData("DECLINE_REQUEST_" + req.getId())
+                            .build();
+                    row.add(declineBtn);
+                    keyboard.add(row);
+                } else if (req.getStatus() == ScheduleRequest.ScheduleStatus.Accepted) {
+                    InlineKeyboardButton changeToDeclineBtn = InlineKeyboardButton.builder()
+                            .text(localizationService.msg(player, "player.requests.change_to_decline_button", timeLabel))
+                            .callbackData("CHANGE_TO_DECLINE_" + req.getId())
+                            .build();
+                    keyboard.add(List.of(changeToDeclineBtn));
+                } else if (req.getStatus() == ScheduleRequest.ScheduleStatus.Declined) {
+                    InlineKeyboardButton changeToAcceptBtn = InlineKeyboardButton.builder()
+                            .text(localizationService.msg(player, "player.requests.change_to_accept_button", timeLabel))
+                            .callbackData("CHANGE_TO_ACCEPT_" + req.getId())
+                            .build();
+                    keyboard.add(List.of(changeToAcceptBtn));
+                }
+            } else if (req.getInitiatorPlayer().getId().equals(player.getId())) {
+                if (req.getStatus() != ScheduleRequest.ScheduleStatus.Cancelled) {
+                    InlineKeyboardButton cancelBtn = InlineKeyboardButton.builder()
+                            .text(localizationService.msg(player, "player.requests.cancel_button", timeLabel))
+                            .callbackData("CANCEL_REQUEST_" + req.getId())
+                            .build();
+                    keyboard.add(List.of(cancelBtn));
+                }
             }
         }
+
         InlineKeyboardButton backBtn = InlineKeyboardButton.builder()
                 .text(localizationService.msg(player, "player.requests.back"))
                 .callbackData("PLAYER_SCHEDULE")
@@ -320,6 +464,280 @@ public class PlayerCommandHandler {
         }
     }
 
+    private void handleCancelRequest(Long chatId, Long userId, String username, Long requestId, TelegramBot bot) {
+        Player player = playerService.findOrLinkPlayer(userId, username);
+        if (player == null) {
+            bot.sendMessage(chatId, localizationService.resolve(Language.RU, "player.not.registered"));
+            return;
+        }
+        try {
+            scheduleRequestService.cancelRequestLocalized(requestId, player.getId(), localizationService, bot::sendMessage);
+            bot.sendMessage(chatId, localizationService.msg(player, "player.requests.cancelled"));
+        } catch (Exception e) {
+            bot.sendMessage(chatId, localizationService.msg(player, "player.requests.cancel.failed", e.getMessage()));
+        }
+    }
+
+    private void handleChangeRequestStatus(Long chatId, Long userId, String username, Long requestId,
+                                          ScheduleRequest.ScheduleStatus newStatus, TelegramBot bot) {
+        Player player = playerService.findOrLinkPlayer(userId, username);
+        if (player == null) {
+            bot.sendMessage(chatId, localizationService.resolve(Language.RU, "player.not.registered"));
+            return;
+        }
+        try {
+            scheduleRequestService.changeRequestStatusLocalized(requestId, player.getId(), newStatus, localizationService, bot::sendMessage);
+            bot.sendMessage(chatId, localizationService.msg(player, "player.requests.status_changed"));
+        } catch (Exception e) {
+            bot.sendMessage(chatId, localizationService.msg(player, "player.requests.change.failed", e.getMessage()));
+        }
+    }
+
+    private void handleManageTour(Long chatId, Long userId, String username, Long tourId, TelegramBot bot) {
+        Player player = playerService.findOrLinkPlayer(userId, username);
+        if (player == null) {
+            bot.sendMessage(chatId, localizationService.resolve(Language.RU, "player.not.registered"));
+            return;
+        }
+
+        ScheduleService.PlayerSchedule schedule = scheduleService.buildPlayerSchedule(player);
+        ScheduleService.TourInfo tourInfo = schedule.tours().stream()
+                .filter(ti -> ti.tourId() != null && ti.tourId().equals(tourId))
+                .findFirst()
+                .orElse(null);
+
+        if (tourInfo == null) {
+            bot.sendMessage(chatId, localizationService.msg(player, "tour.not.found"));
+            return;
+        }
+
+        int tourNumber = schedule.tours().indexOf(tourInfo) + 1;
+        StringBuilder message = new StringBuilder();
+        message.append(localizationService.msg(player, "tour.manage.header", tourNumber)).append("\n\n");
+
+        String start = ScheduleService.DATE_FMT.format(tourInfo.startDate());
+        String end = ScheduleService.DATE_FMT.format(tourInfo.endDate());
+        message.append(localizationService.msg(player, "tour.manage.dates", start, end)).append("\n");
+
+        if (tourInfo.opponent() != null) {
+            String opponentInfo = tourInfo.opponent().getName();
+            if (tourInfo.opponent().getTelegramUsername() != null && !tourInfo.opponent().getTelegramUsername().isEmpty()) {
+                opponentInfo += " (@" + tourInfo.opponent().getTelegramUsername() + ")";
+            }
+            message.append(localizationService.msg(player, "tour.manage.tour_opponent", opponentInfo)).append("\n");
+
+            if (tourInfo.responsiblePlayer() != null) {
+                if (tourInfo.responsiblePlayer().getId().equals(player.getId())) {
+                    message.append(localizationService.msg(player, "tour.manage.responsible.you")).append("\n");
+                } else {
+                    message.append(localizationService.msg(player, "tour.manage.responsible.opponent", tourInfo.responsiblePlayer().getName())).append("\n");
+                }
+            }
+
+            String opponentCourts = tourInfo.opponent().getPreferredCourts();
+            if (opponentCourts != null && !opponentCourts.isEmpty()) {
+                String[] courts = opponentCourts.split(",");
+                StringBuilder courtsList = new StringBuilder();
+                for (int i = 0; i < courts.length; i++) {
+                    if (i > 0) courtsList.append(", ");
+                    courtsList.append(getCourtDisplayName(courts[i], player));
+                }
+                message.append(localizationService.msg(player, "player.courts.setup.opponent", courtsList.toString())).append("\n");
+            } else {
+                message.append(localizationService.msg(player, "player.courts.setup.opponent",
+                    localizationService.msg(player, "player.courts.setup.not_set"))).append("\n");
+            }
+        }
+
+        List<AvailabilitySlot> playerSlots = availabilityService.getPlayerTourAvailability(player.getId(), tourId).map(List::of).orElse(List.of());
+        List<AvailabilitySlot> opponentSlots = tourInfo.opponent() != null ?
+                availabilityService.getPlayerTourAvailability(tourInfo.opponent().getId(), tourId).map(List::of).orElse(List.of()) :
+                List.of();
+
+        String playerStatus = playerSlots.isEmpty() ?
+                localizationService.msg(player, "schedule.status.not.set") :
+                localizationService.msg(player, "schedule.status.set");
+        message.append(localizationService.msg(player, "tour.manage.availability.you", playerStatus)).append("\n");
+
+        if (tourInfo.opponent() != null) {
+            String opponentStatus = opponentSlots.isEmpty() ?
+                    localizationService.msg(player, "schedule.status.not.set") :
+                    localizationService.msg(player, "schedule.status.set");
+            message.append(localizationService.msg(player, "tour.manage.availability.opponent", opponentStatus)).append("\n");
+        }
+
+        List<ScheduleRequest> tourRequests = scheduleRequestService.getTourRequests(tourId, player.getId());
+        long incomingPending = tourRequests.stream()
+                .filter(r -> r.getRecipientPlayer().getId().equals(player.getId()) && r.getStatus() == ScheduleRequest.ScheduleStatus.Pending)
+                .count();
+        long outgoingPending = tourRequests.stream()
+                .filter(r -> r.getInitiatorPlayer().getId().equals(player.getId()) && r.getStatus() == ScheduleRequest.ScheduleStatus.Pending)
+                .count();
+
+        if (incomingPending > 0 || outgoingPending > 0) {
+            message.append("\n").append(localizationService.msg(player, "tour.manage.requests.summary", incomingPending, outgoingPending)).append("\n");
+        }
+
+        if (tourInfo.status() == Tour.TourStatus.Scheduled && tourInfo.scheduledTime() != null) {
+            DateTimeFormatter timeFmt = DateTimeFormatter.ofPattern("dd.MM HH:mm").withZone(java.time.ZoneId.of("Asia/Tbilisi"));
+            message.append("\n").append(localizationService.msg(player, "tour.manage.scheduled", timeFmt.format(tourInfo.scheduledTime()))).append("\n");
+        }
+
+        message.append("\n").append(localizationService.msg(player, "tour.manage.status", tourInfo.status()));
+
+        List<List<InlineKeyboardButton>> keyboard = new ArrayList<>();
+
+        InlineKeyboardButton setAvailabilityBtn = InlineKeyboardButton.builder()
+                .text(localizationService.msg(player, "tour.manage.button.availability"))
+                .webApp(new WebAppInfo(baseUrl + "/webapp/calendar?playerId=" + player.getTelegramId() + "&tourId=" + tourId))
+                .build();
+        keyboard.add(List.of(setAvailabilityBtn));
+
+        if (!playerSlots.isEmpty() && !opponentSlots.isEmpty()) {
+            InlineKeyboardButton compatibleBtn = InlineKeyboardButton.builder()
+                    .text(localizationService.msg(player, "tour.manage.button.compatible"))
+                    .webApp(new WebAppInfo(baseUrl + "/webapp/compatible?playerId=" + player.getId() + "&opponentId=" + tourInfo.opponent().getId() + "&tourId=" + tourId))
+                    .build();
+            keyboard.add(List.of(compatibleBtn));
+        }
+
+        InlineKeyboardButton acceptedRequestsBtn = InlineKeyboardButton.builder()
+                .text(localizationService.msg(player, "tour.manage.button.requests.accepted"))
+                .callbackData("VIEW_REQUESTS_ACCEPTED_" + tourId)
+                .build();
+        InlineKeyboardButton allRequestsBtn = InlineKeyboardButton.builder()
+                .text(localizationService.msg(player, "tour.manage.button.requests.all"))
+                .callbackData("VIEW_REQUESTS_ALL_" + tourId)
+                .build();
+        keyboard.add(List.of(acceptedRequestsBtn, allRequestsBtn));
+
+        if (tourInfo.status() == Tour.TourStatus.Active || tourInfo.status() == Tour.TourStatus.Scheduled) {
+            InlineKeyboardButton completeBtn = InlineKeyboardButton.builder()
+                    .text(localizationService.msg(player, "tour.manage.button.complete"))
+                    .callbackData("COMPLETE_TOUR_" + tourId)
+                    .build();
+            keyboard.add(List.of(completeBtn));
+
+            InlineKeyboardButton postponeBtn = InlineKeyboardButton.builder()
+                    .text(localizationService.msg(player, "tour.manage.button.postpone"))
+                    .callbackData("POSTPONE_TOUR_" + tourId)
+                    .build();
+            keyboard.add(List.of(postponeBtn));
+        }
+
+        InlineKeyboardButton backBtn = InlineKeyboardButton.builder()
+                .text(localizationService.msg(player, "tour.manage.button.back"))
+                .callbackData("PLAYER_SCHEDULE")
+                .build();
+        keyboard.add(List.of(backBtn));
+
+        SendMessage msg = SendMessage.builder()
+                .chatId(chatId.toString())
+                .text(message.toString())
+                .replyMarkup(InlineKeyboardMarkup.builder().keyboard(keyboard).build())
+                .build();
+
+        try {
+            bot.execute(msg);
+        } catch (Exception e) {
+            logger.error("Failed to send manage tour screen", e);
+        }
+    }
+
+    private void handleCompleteTour(Long chatId, Long userId, String username, Long tourId, TelegramBot bot) {
+        Player player = playerService.findOrLinkPlayer(userId, username);
+        if (player == null) {
+            bot.sendMessage(chatId, localizationService.resolve(Language.RU, "player.not.registered"));
+            return;
+        }
+
+        List<List<InlineKeyboardButton>> keyboard = new ArrayList<>();
+        InlineKeyboardButton confirmBtn = InlineKeyboardButton.builder()
+                .text(localizationService.msg(player, "tour.complete.confirm"))
+                .callbackData("CONFIRM_COMPLETE_" + tourId)
+                .build();
+        InlineKeyboardButton cancelBtn = InlineKeyboardButton.builder()
+                .text(localizationService.msg(player, "tour.complete.cancel"))
+                .callbackData("MANAGE_TOUR_" + tourId)
+                .build();
+        keyboard.add(List.of(confirmBtn, cancelBtn));
+
+        SendMessage msg = SendMessage.builder()
+                .chatId(chatId.toString())
+                .text(localizationService.msg(player, "tour.complete.confirmation"))
+                .replyMarkup(InlineKeyboardMarkup.builder().keyboard(keyboard).build())
+                .build();
+
+        try {
+            bot.execute(msg);
+        } catch (Exception e) {
+            logger.error("Failed to show complete confirmation", e);
+        }
+    }
+
+    private void handlePostponeTour(Long chatId, Long userId, String username, Long tourId, TelegramBot bot) {
+        Player player = playerService.findOrLinkPlayer(userId, username);
+        if (player == null) {
+            bot.sendMessage(chatId, localizationService.resolve(Language.RU, "player.not.registered"));
+            return;
+        }
+
+        List<List<InlineKeyboardButton>> keyboard = new ArrayList<>();
+        InlineKeyboardButton confirmBtn = InlineKeyboardButton.builder()
+                .text(localizationService.msg(player, "tour.postpone.confirm"))
+                .callbackData("CONFIRM_POSTPONE_" + tourId)
+                .build();
+        InlineKeyboardButton cancelBtn = InlineKeyboardButton.builder()
+                .text(localizationService.msg(player, "tour.postpone.cancel"))
+                .callbackData("MANAGE_TOUR_" + tourId)
+                .build();
+        keyboard.add(List.of(confirmBtn, cancelBtn));
+
+        SendMessage msg = SendMessage.builder()
+                .chatId(chatId.toString())
+                .text(localizationService.msg(player, "tour.postpone.confirmation"))
+                .replyMarkup(InlineKeyboardMarkup.builder().keyboard(keyboard).build())
+                .build();
+
+        try {
+            bot.execute(msg);
+        } catch (Exception e) {
+            logger.error("Failed to show postpone confirmation", e);
+        }
+    }
+
+    private void confirmCompleteTour(Long chatId, Long userId, String username, Long tourId, TelegramBot bot) {
+        Player player = playerService.findOrLinkPlayer(userId, username);
+        if (player == null) {
+            bot.sendMessage(chatId, localizationService.resolve(Language.RU, "player.not.registered"));
+            return;
+        }
+
+        try {
+            scheduleRequestService.completeTour(tourId);
+            bot.sendMessage(chatId, localizationService.msg(player, "tour.complete.success"));
+            handleSchedule(chatId, userId, username, bot);
+        } catch (Exception e) {
+            bot.sendMessage(chatId, localizationService.msg(player, "tour.complete.failed", e.getMessage()));
+        }
+    }
+
+    private void confirmPostponeTour(Long chatId, Long userId, String username, Long tourId, TelegramBot bot) {
+        Player player = playerService.findOrLinkPlayer(userId, username);
+        if (player == null) {
+            bot.sendMessage(chatId, localizationService.resolve(Language.RU, "player.not.registered"));
+            return;
+        }
+
+        try {
+            scheduleRequestService.postponeTour(tourId);
+            bot.sendMessage(chatId, localizationService.msg(player, "tour.postpone.success"));
+            handleSchedule(chatId, userId, username, bot);
+        } catch (Exception e) {
+            bot.sendMessage(chatId, localizationService.msg(player, "tour.postpone.failed", e.getMessage()));
+        }
+    }
+
     private void sendLanguageConfig(Long chatId, Player player, TelegramBot bot) {
         List<List<InlineKeyboardButton>> keyboard = new ArrayList<>();
         InlineKeyboardButton ruBtn = InlineKeyboardButton.builder()
@@ -340,6 +758,90 @@ public class PlayerCommandHandler {
             bot.execute(msg);
         } catch (Exception e) {
             logger.error("Failed to send language config", e);
+        }
+    }
+
+    private void handleCourtsSetup(Long chatId, Player player, TelegramBot bot) {
+        showCourtsSelectionScreen(chatId, player, "", bot);
+    }
+
+    private void handleCourtSelection(Long chatId, Player player, String court, TelegramBot bot) {
+        String currentCourts = player.getPreferredCourts();
+        if (currentCourts == null) {
+            currentCourts = "";
+        }
+
+        String newCourts;
+        if (currentCourts.isEmpty()) {
+            newCourts = court;
+        } else {
+            newCourts = currentCourts + "," + court;
+        }
+
+        player.setPreferredCourts(newCourts);
+        showCourtsSelectionScreen(chatId, player, newCourts, bot);
+    }
+
+    private void handleCourtFinish(Long chatId, Player player, TelegramBot bot) {
+        playerService.updatePreferredCourts(player, player.getPreferredCourts());
+        bot.sendMessage(chatId, localizationService.msg(player, "player.courts.setup.saved"));
+        handleStartCommand(chatId, player.getTelegramId(), bot);
+    }
+
+    private void showCourtsSelectionScreen(Long chatId, Player player, String currentSelection, TelegramBot bot) {
+        StringBuilder message = new StringBuilder();
+        message.append(localizationService.msg(player, "player.courts.setup.header"));
+
+        if (currentSelection == null || currentSelection.isEmpty()) {
+            message.append(localizationService.msg(player, "player.courts.setup.none"));
+        } else {
+            String[] courts = currentSelection.split(",");
+            for (int i = 0; i < courts.length; i++) {
+                message.append("\n").append(i + 1).append(". ").append(getCourtDisplayName(courts[i], player));
+            }
+        }
+
+        List<List<InlineKeyboardButton>> keyboard = new ArrayList<>();
+
+        for (Court court : Court.values()) {
+            String buttonText = court == Court.OTHER
+                ? localizationService.msg(player, "player.courts.setup.other")
+                : court.getDisplayName();
+
+            InlineKeyboardButton courtBtn = InlineKeyboardButton.builder()
+                    .text(buttonText)
+                    .callbackData("COURT_SELECT_" + court.name())
+                    .build();
+            keyboard.add(List.of(courtBtn));
+        }
+
+        InlineKeyboardButton finishBtn = InlineKeyboardButton.builder()
+                .text(localizationService.msg(player, "player.courts.setup.finish_button"))
+                .callbackData("COURT_FINISH")
+                .build();
+        keyboard.add(List.of(finishBtn));
+
+        SendMessage msg = SendMessage.builder()
+                .chatId(chatId.toString())
+                .text(message.toString())
+                .replyMarkup(InlineKeyboardMarkup.builder().keyboard(keyboard).build())
+                .build();
+
+        try {
+            bot.execute(msg);
+        } catch (Exception e) {
+            logger.error("Failed to send courts selection screen", e);
+        }
+    }
+
+    private String getCourtDisplayName(String courtCode, Player player) {
+        try {
+            Court court = Court.valueOf(courtCode);
+            return court == Court.OTHER
+                ? localizationService.msg(player, "player.courts.setup.other")
+                : court.getDisplayName();
+        } catch (IllegalArgumentException e) {
+            return courtCode;
         }
     }
 }

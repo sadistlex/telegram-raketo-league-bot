@@ -10,12 +10,16 @@ player:
     set_availability: "Set Availability (Tour {0})"
     compatible_times: "Compatible Times (T{0})"
     view_requests: "View Requests (T{0})"
+    manage_tour: "Manage Tour {0}"
+    requests_count: "📩 ({0}/{1})"
+    select_division: "Select Division"
+    division_button: "{0} - {1}"
   not:
     registered: "You are not registered. Contact admin."
   requests:
     back: "🔙 Back to Schedule"
-    accept_button: "✅ Accept #{0}"
-    decline_button: "❌ Decline #{0}"
+    accept_button: "✅ Accept {0}"
+    decline_button: "❌ Decline {0}"
     accepted: "✅ Request accepted! Match has been scheduled."
     declined: "❌ Request declined."
     accept:
@@ -23,11 +27,21 @@ player:
     decline:
       failed: "❌ Failed to decline request: {0}"
   help:
-    header: "Player Commands:\n"
-    schedule: "{0} - View schedule"
-    help: "{0} - This help"
+    header: "📋 Player Commands & Features:\n\n"
+    schedule: "{0} - View your match schedule\n"
+    help: "{0} - Show this help message\n"
+    features: "\n🎾 Features:\n\n• Set Availability - Mark your available time slots for each tour\n• Compatible Times - See overlapping availability with opponent and send match requests\n• Match Requests - Accept/decline incoming requests, cancel your outgoing requests, or change your mind after accepting/declining\n• Preferred Courts - Set your preferred courts in priority order\n• Complete Tour - Mark tour as completed after playing the match\n• Postpone Tour - Reset tour if you need to reschedule (max 1 postponement at a time)\n\n👤 Responsible Players:\nEach tour has a responsible player who:\n• Should contact courts for booking\n• Should coordinate with opponent\n• Has priority for court selection\n\n⚠️ Important: You cannot postpone more than 1 tour at a time.\n"
     admin:
       header: "\nAdmin Commands:\n"
+  courts:
+    setup:
+      header: "🎾 Set Your Preferred Courts\n\nSelect courts in order of preference.\nClick 'Finish' when done.\n\nCurrent order:"
+      none: "\n(none selected yet)"
+      finish_button: "✅ Finish"
+      other: "Other"
+      saved: "✅ Preferred courts saved!"
+      opponent: "Opponent's preferred courts: {0}"
+      not_set: "not set"
   unknown:
     command: "Unknown command. Type {0} for available commands."
 
@@ -117,10 +131,6 @@ admin:
     no_players: "No players found in this division tournament."
     div:
       header: "Schedule for Division Tournament ID: {0}\n\n"
-    player:
-      line: "Player: {0} (@{1})"
-    no_tours: "  No tours assigned"
-    bye: "Bye"
   tours:
     generate:
       usage: "Usage: {0} <divisionTournamentId> <start:yyyy-MM-dd> <intervalDays>"
@@ -161,6 +171,16 @@ match:
       only:
         recipient: "Only recipient can decline request"
       notification: "❌ Your match request was declined.\n\nOpponent: {0}\nDate: {1}\n"
+    cancel:
+      only:
+        initiator: "Only initiator can cancel request"
+      notification: "🚫 Match request was cancelled.\n\nOpponent: {0}\nDate: {1}\n"
+    change:
+      only:
+        recipient: "Only recipient can change request status"
+      use:
+        accept:
+          decline: "Use Accept/Decline buttons for pending requests"
     not:
       pending: "Request is not pending"
 
@@ -169,13 +189,60 @@ schedule:
   none: "No tours assigned yet."
   tour:
     line: "Tour {0} ({1}-{2}) - {3}"
+    number: "Tour {0}"
+    dates: "📅 {0}-{1}"
+    opponent_name: "Opponent: {0}"
+    availability: "Availability:"
+    you: "  You: {0}"
+    opponent:
+      status: "  Opponent: {0}"
+    scheduled: "⏰ Scheduled: {0}"
   availability:
     status: ", Availability - You: {0}, Opponent: {1}"
   status:
     not:
-      set: "Not Set"
-    set: "Set"
+      set: "not set ❌"
+    set: "set ✅"
   bye: "Bye"
+
+tour:
+  not:
+    found: "Tour not found"
+  manage:
+    header: "🎾 Manage Tour {0}"
+    dates: "📅 {0} - {1}"
+    tour_opponent: "Opponent: {0}"
+    responsible:
+      you: "📞 You are responsible for booking"
+      opponent: "📞 {0} is responsible for booking"
+    availability:
+      you: "Your availability: {0}"
+      opponent: "Opponent availability: {0}"
+    requests:
+      summary: "📨 Requests: incoming {0}, outgoing {1}"
+    scheduled: "⏰ Scheduled match: {0}"
+    status: "Status: {0}"
+    button:
+      availability: "📝 Set Availability"
+      compatible: "🕐 Compatible Times"
+      requests:
+        accepted: "✅ Accepted Requests"
+        all: "📩 All Requests"
+      complete: "✅ Complete Tour"
+      postpone: "⏸ Postpone Tour"
+      back: "🔙 Back to Schedule"
+  complete:
+    confirmation: "⚠️ Are you sure you want to complete this tour?\n\nThis action means the match has been played and the tour is finished. All pending requests will be cancelled."
+    confirm: "✅ Yes, complete"
+    cancel: "❌ Cancel"
+    success: "✅ Tour completed successfully!"
+    failed: "❌ Failed to complete tour: {0}"
+  postpone:
+    confirmation: "⚠️ Are you sure you want to postpone this tour?\n\nThis action will reset the tour status and cancel all accepted requests. Availability will be preserved."
+    confirm: "✅ Yes, postpone"
+    cancel: "❌ Cancel"
+    success: "✅ Tour postponed. Status reset to Active."
+    failed: "❌ Failed to postpone tour: {0}"
 
 config:
   language:
@@ -197,8 +264,8 @@ web:
       available: "Available"
       busy: "Busy"
     toggle:
-      show: "Show 00:00-07:00"
-      hide: "Hide 00:00-07:00"
+      show: "Show 00:00-07:59"
+      hide: "Hide 00:00-07:59"
     week:
       previous: "← Previous"
       next: "Next →"
@@ -218,8 +285,8 @@ web:
       not: "Not Compatible"
       selected: "Selected"
     toggle:
-      show: "Show 00:00-07:00"
-      hide: "Hide 00:00-07:00"
+      show: "Show 00:00-07:59"
+      hide: "Hide 00:00-07:59"
     week:
       previous: "← Previous"
       next: "Next →"

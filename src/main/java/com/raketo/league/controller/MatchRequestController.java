@@ -1,6 +1,5 @@
 package com.raketo.league.controller;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.raketo.league.model.Player;
 import com.raketo.league.model.ScheduleRequest;
 import com.raketo.league.model.Tour;
@@ -14,6 +13,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
+import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
+import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -73,10 +75,10 @@ public class MatchRequestController {
             initiatorMsg.append("Tour: ").append(tour.getId()).append("\n");
             initiatorMsg.append("Proposed times:\n");
             for (ScheduleRequest req : requests) {
-                initiatorMsg.append("📅 ").append(FormatUtils.formatDate(req.getProposedDate()));
+                initiatorMsg.append("📅 ").append(FormatUtils.formatDateWithDay(req.getProposedDate()));
                 List<Integer> hours = FormatUtils.parseHoursFromJson(req.getProposedHours());
                 if (!hours.isEmpty()) {
-                    initiatorMsg.append(" (").append(FormatUtils.formatHours(hours)).append(")");
+                    initiatorMsg.append(" ").append(FormatUtils.formatHours(hours));
                 }
                 initiatorMsg.append("\n");
             }
@@ -90,16 +92,53 @@ public class MatchRequestController {
             recipientMsg.append("Tour: ").append(tour.getId()).append("\n");
             recipientMsg.append("Proposed times:\n");
             for (ScheduleRequest req : requests) {
-                recipientMsg.append("📅 ").append(FormatUtils.formatDate(req.getProposedDate()));
+                recipientMsg.append("📅 ").append(FormatUtils.formatDateWithDay(req.getProposedDate()));
                 List<Integer> hours = FormatUtils.parseHoursFromJson(req.getProposedHours());
                 if (!hours.isEmpty()) {
-                    recipientMsg.append(" (").append(FormatUtils.formatHours(hours)).append(")");
+                    recipientMsg.append(" ").append(FormatUtils.formatHours(hours));
                 }
                 recipientMsg.append("\n");
             }
-            recipientMsg.append("\nUse /schedule to view and respond to requests.");
 
-            telegramBot.sendMessage(recipient.getTelegramId(), recipientMsg.toString());
+            List<List<InlineKeyboardButton>> keyboard = new ArrayList<>();
+            for (ScheduleRequest req : requests) {
+                List<Integer> hours = FormatUtils.parseHoursFromJson(req.getProposedHours());
+                String timeLabel = FormatUtils.formatDateWithDay(req.getProposedDate());
+                if (!hours.isEmpty()) {
+                    timeLabel += " " + FormatUtils.formatHours(hours);
+                }
+
+                List<InlineKeyboardButton> row = new ArrayList<>();
+                InlineKeyboardButton acceptBtn =
+                    InlineKeyboardButton.builder()
+                        .text("✅ Accept " + timeLabel)
+                        .callbackData("ACCEPT_REQUEST_" + req.getId())
+                        .build();
+                row.add(acceptBtn);
+
+                InlineKeyboardButton declineBtn =
+                    InlineKeyboardButton.builder()
+                        .text("❌ Decline " + timeLabel)
+                        .callbackData("DECLINE_REQUEST_" + req.getId())
+                        .build();
+                row.add(declineBtn);
+                keyboard.add(row);
+            }
+
+            SendMessage message =
+                SendMessage.builder()
+                    .chatId(recipient.getTelegramId().toString())
+                    .text(recipientMsg.toString())
+                    .replyMarkup(InlineKeyboardMarkup.builder()
+                        .keyboard(keyboard)
+                        .build())
+                    .build();
+
+            try {
+                telegramBot.execute(message);
+            } catch (Exception e) {
+                telegramBot.sendMessage(recipient.getTelegramId(), recipientMsg.toString());
+            }
         }
     }
 

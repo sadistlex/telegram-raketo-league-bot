@@ -86,20 +86,19 @@ public class ScheduleRequestService {
             sb.append(localizationService.msg(currentPlayer, "requests.incoming.header"));
             for (ScheduleRequest req : incoming) {
                 sb.append(localizationService.msg(currentPlayer, "requests.from", req.getInitiatorPlayer().getName())).append("\n");
-                sb.append(localizationService.msg(currentPlayer, "requests.date", FormatUtils.formatDate(req.getProposedDate()))).append("\n");
+                sb.append(localizationService.msg(currentPlayer, "requests.date", FormatUtils.formatDateWithDay(req.getProposedDate()))).append("\n");
                 List<Integer> hours = FormatUtils.parseHoursFromJson(req.getProposedHours());
                 if (!hours.isEmpty()) {
                     sb.append(localizationService.msg(currentPlayer, "requests.time", FormatUtils.formatHours(hours))).append("\n");
                 }
-                sb.append(localizationService.msg(currentPlayer, "requests.status", getStatusEmoji(req.getStatus()), req.getStatus())).append("\n");
-                sb.append(localizationService.msg(currentPlayer, "requests.id", req.getId())).append("\n\n");
+                sb.append(localizationService.msg(currentPlayer, "requests.status", getStatusEmoji(req.getStatus()), req.getStatus())).append("\n\n");
             }
         }
         if (!outgoing.isEmpty()) {
             sb.append(localizationService.msg(currentPlayer, "requests.outgoing.header"));
             for (ScheduleRequest req : outgoing) {
                 sb.append(localizationService.msg(currentPlayer, "requests.to", req.getRecipientPlayer().getName())).append("\n");
-                sb.append(localizationService.msg(currentPlayer, "requests.date", FormatUtils.formatDate(req.getProposedDate()))).append("\n");
+                sb.append(localizationService.msg(currentPlayer, "requests.date", FormatUtils.formatDateWithDay(req.getProposedDate()))).append("\n");
                 List<Integer> hours = FormatUtils.parseHoursFromJson(req.getProposedHours());
                 if (!hours.isEmpty()) {
                     sb.append(localizationService.msg(currentPlayer, "requests.time", FormatUtils.formatHours(hours))).append("\n");
@@ -124,6 +123,128 @@ public class ScheduleRequestService {
                 return "\uD83D\uDEAB";
             default:
                 return "";
+        }
+    }
+
+    @Transactional
+    public void completeTour(Long tourId) {
+        Tour tour = tourRepository.findById(tourId)
+                .orElseThrow(() -> new IllegalArgumentException("Tour not found"));
+
+        tour.setStatus(Tour.TourStatus.Completed);
+        tour.setCompleteDate(LocalDateTime.now());
+        tour.setUpdatedAt(LocalDateTime.now());
+        tourRepository.save(tour);
+
+        List<ScheduleRequest> pendingRequests = scheduleRequestRepository.findByTourIdAndStatus(tourId, ScheduleRequest.ScheduleStatus.Pending);
+        for (ScheduleRequest req : pendingRequests) {
+            req.setStatus(ScheduleRequest.ScheduleStatus.Cancelled);
+            req.setUpdatedAt(LocalDateTime.now());
+            scheduleRequestRepository.save(req);
+        }
+    }
+
+    @Transactional
+    public void postponeTour(Long tourId) {
+        Tour tour = tourRepository.findById(tourId)
+                .orElseThrow(() -> new IllegalArgumentException("Tour not found"));
+
+        tour.setStatus(Tour.TourStatus.Active);
+        tour.setScheduledTime(null);
+        tour.setUpdatedAt(LocalDateTime.now());
+        tourRepository.save(tour);
+
+        List<ScheduleRequest> acceptedRequests = scheduleRequestRepository.findByTourIdAndStatus(tourId, ScheduleRequest.ScheduleStatus.Accepted);
+        for (ScheduleRequest req : acceptedRequests) {
+            req.setStatus(ScheduleRequest.ScheduleStatus.Cancelled);
+            req.setUpdatedAt(LocalDateTime.now());
+            scheduleRequestRepository.save(req);
+        }
+    }
+
+    @Transactional
+    public void cancelRequestLocalized(Long requestId, Long cancellingPlayerId, LocalizationService localizationService, BiConsumer<Long, String> messageSender) {
+        ScheduleRequest request = scheduleRequestRepository.findById(requestId)
+                .orElseThrow(() -> new IllegalArgumentException("Request not found"));
+
+        if (!request.getInitiatorPlayer().getId().equals(cancellingPlayerId)) {
+            throw new IllegalArgumentException(localizationService.msg(request.getInitiatorPlayer(), "match.request.cancel.only.initiator"));
+        }
+
+        ScheduleRequest.ScheduleStatus oldStatus = request.getStatus();
+        request.setStatus(ScheduleRequest.ScheduleStatus.Cancelled);
+        request.setUpdatedAt(LocalDateTime.now());
+        scheduleRequestRepository.save(request);
+
+        if (oldStatus == ScheduleRequest.ScheduleStatus.Accepted) {
+            Tour tour = request.getTour();
+            tour.setStatus(Tour.TourStatus.Active);
+            tour.setScheduledTime(null);
+            tour.setUpdatedAt(LocalDateTime.now());
+            tourRepository.save(tour);
+        }
+
+        if (messageSender != null && oldStatus != ScheduleRequest.ScheduleStatus.Pending) {
+            Player recipient = request.getRecipientPlayer();
+            String notification = localizationService.msg(recipient, "match.request.cancel.notification",
+                request.getInitiatorPlayer().getName(),
+                FormatUtils.formatDate(request.getProposedDate()));
+            messageSender.accept(recipient.getTelegramId(), notification);
+        }
+    }
+
+    @Transactional
+    public void changeRequestStatusLocalized(Long requestId, Long requestingPlayerId, ScheduleRequest.ScheduleStatus newStatus,
+                                            LocalizationService localizationService, BiConsumer<Long, String> messageSender) {
+        ScheduleRequest request = scheduleRequestRepository.findById(requestId)
+                .orElseThrow(() -> new IllegalArgumentException("Request not found"));
+
+        if (!request.getRecipientPlayer().getId().equals(requestingPlayerId)) {
+            throw new IllegalArgumentException(localizationService.msg(request.getRecipientPlayer(), "match.request.change.only.recipient"));
+        }
+
+        ScheduleRequest.ScheduleStatus oldStatus = request.getStatus();
+
+        if (oldStatus == ScheduleRequest.ScheduleStatus.Pending) {
+            throw new IllegalArgumentException(localizationService.msg(request.getRecipientPlayer(), "match.request.change.use.accept.decline"));
+        }
+
+        request.setStatus(newStatus);
+        request.setUpdatedAt(LocalDateTime.now());
+        scheduleRequestRepository.save(request);
+
+        Tour tour = request.getTour();
+
+        if (newStatus == ScheduleRequest.ScheduleStatus.Accepted) {
+            List<Integer> hours = FormatUtils.parseHoursFromJson(request.getProposedHours());
+            if (!hours.isEmpty()) {
+                LocalDateTime scheduledTime = request.getProposedDate().atTime(hours.get(0), 0);
+                tour.setScheduledTime(scheduledTime);
+            }
+            tour.setStatus(Tour.TourStatus.Scheduled);
+        } else if (oldStatus == ScheduleRequest.ScheduleStatus.Accepted) {
+            tour.setStatus(Tour.TourStatus.Active);
+            tour.setScheduledTime(null);
+        }
+        tour.setUpdatedAt(LocalDateTime.now());
+        tourRepository.save(tour);
+
+        if (messageSender != null) {
+            Player initiator = request.getInitiatorPlayer();
+            String notification;
+            if (newStatus == ScheduleRequest.ScheduleStatus.Accepted) {
+                List<Integer> hrs = FormatUtils.parseHoursFromJson(request.getProposedHours());
+                String timeStr = hrs.isEmpty() ? "" : FormatUtils.formatHours(hrs);
+                notification = localizationService.msg(initiator, "match.request.accept.notification",
+                    request.getRecipientPlayer().getName(),
+                    FormatUtils.formatDate(request.getProposedDate()),
+                    timeStr);
+            } else {
+                notification = localizationService.msg(initiator, "match.request.decline.notification",
+                    request.getRecipientPlayer().getName(),
+                    FormatUtils.formatDate(request.getProposedDate()));
+            }
+            messageSender.accept(initiator.getTelegramId(), notification);
         }
     }
 }
