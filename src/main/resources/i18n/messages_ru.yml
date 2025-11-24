@@ -20,9 +20,9 @@ player:
     back: "🔙 К графику"
     accept_button_short: "✅ {0}"
     decline_button_short: "❌ {0}"
-    change_to_accept_button_short: "✅ {0}"
-    change_to_decline_button_short: "❌ {0}"
-    cancel_button_short: "🚫 {0}"
+    change_to_accept_button_short: "✅ Принять {0}"
+    change_to_decline_button_short: "❌ Отказаться {0}"
+    cancel_button_short: "🚫 Отменить {0}"
     accepted: "✅ Запрос принят! Матч запланирован."
     declined: "❌ Запрос отклонён."
     accept:

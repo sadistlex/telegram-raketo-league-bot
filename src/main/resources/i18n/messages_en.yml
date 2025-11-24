@@ -20,9 +20,9 @@ player:
     back: "🔙 Back to Schedule"
     accept_button_short: "✅ {0}"
     decline_button_short: "❌ {0}"
-    change_to_accept_button_short: "✅ {0}"
-    change_to_decline_button_short: "❌ {0}"
-    cancel_button_short: "🚫 {0}"
+    change_to_accept_button_short: "✅ Accept {0}"
+    change_to_decline_button_short: "❌ Deny {0}"
+    cancel_button_short: "🚫 Cancel {0}"
     accepted: "✅ Request accepted! Match has been scheduled."
     declined: "❌ Request declined."
     accept:
