@@ -1,5 +1,6 @@
 package com.raketo.league.model;
 
+import com.raketo.league.audit.AuditEntityListener;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -7,6 +8,7 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "schedule_requests")
+@EntityListeners(AuditEntityListener.class)
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

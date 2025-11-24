@@ -4,6 +4,7 @@ import com.raketo.league.model.*;
 import com.raketo.league.service.*;
 import com.raketo.league.telegram.BotCommand;
 import com.raketo.league.telegram.TelegramBot;
+import com.raketo.league.util.PlayerContextHolder;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,15 +40,23 @@ public class PlayerCommandHandler {
         Long chatId = update.getMessage().getChatId();
         Long userId = update.getMessage().getFrom().getId();
         String username = update.getMessage().getFrom().getUserName();
-        if (BotCommand.START.matches(text)) {
-            handleStartCommand(chatId, userId, bot);
-        } else if (BotCommand.SCHEDULE.matches(text)) {
-            handleSchedule(chatId, userId, username, bot);
-        } else if (BotCommand.HELP.matches(text)) {
-            handleHelp(chatId, userId, bot);
-        } else {
-            Player p = playerService.findByTelegramId(userId).orElse(null);
-            bot.sendMessage(chatId, localizationService.msg(p, "player.unknown.command", BotCommand.HELP.getCommand()));
+        try {
+            Player maybePlayer = playerService.findByTelegramId(userId).orElse(null);
+            if (maybePlayer != null) {
+                PlayerContextHolder.setCurrentPlayerId(maybePlayer.getId());
+            }
+            if (BotCommand.START.matches(text)) {
+                handleStartCommand(chatId, userId, bot);
+            } else if (BotCommand.SCHEDULE.matches(text)) {
+                handleSchedule(chatId, userId, username, bot);
+            } else if (BotCommand.HELP.matches(text)) {
+                handleHelp(chatId, userId, bot);
+            } else {
+                Player p = playerService.findByTelegramId(userId).orElse(null);
+                bot.sendMessage(chatId, localizationService.msg(p, "player.unknown.command", BotCommand.HELP.getCommand()));
+            }
+        } finally {
+            PlayerContextHolder.clear();
         }
     }
 
@@ -57,74 +66,81 @@ public class PlayerCommandHandler {
         Long userId = update.getCallbackQuery().getFrom().getId();
         String username = update.getCallbackQuery().getFrom().getUserName();
         Player player = playerService.findOrLinkPlayer(userId, username);
+        try {
+            if (player != null) {
+                PlayerContextHolder.setCurrentPlayerId(player.getId());
+            }
 
-        if ("PLAYER_SCHEDULE_REFRESH".equals(callbackData) || "PLAYER_SCHEDULE".equals(callbackData)) {
-            handleSchedule(chatId, userId, username, bot);
-        } else if (callbackData.startsWith("SCHEDULE_DIVISION_")) {
-            Long divisionTournamentId = Long.parseLong(callbackData.substring("SCHEDULE_DIVISION_".length()));
-            handleScheduleForDivision(chatId, userId, username, divisionTournamentId, bot);
-        } else if ("PLAYER_HELP".equals(callbackData)) {
-            handleHelp(chatId, userId, bot);
-        } else if ("PLAYER_CONFIG".equals(callbackData)) {
-            sendLanguageConfig(chatId, player, bot);
-        } else if ("PLAYER_COURTS".equals(callbackData)) {
-            handleCourtsSetup(chatId, player, bot);
-        } else if (callbackData.startsWith("COURT_SELECT_")) {
-            String court = callbackData.substring("COURT_SELECT_".length());
-            handleCourtSelection(chatId, player, court, bot);
-        } else if ("COURT_FINISH".equals(callbackData)) {
-            handleCourtFinish(chatId, player, bot);
-        } else if ("LANG_RU".equals(callbackData)) {
-            if (player != null) {
-                playerService.updateLanguage(player, Language.RU);
+            if ("PLAYER_SCHEDULE_REFRESH".equals(callbackData) || "PLAYER_SCHEDULE".equals(callbackData)) {
+                handleSchedule(chatId, userId, username, bot);
+            } else if (callbackData.startsWith("SCHEDULE_DIVISION_")) {
+                Long divisionTournamentId = Long.parseLong(callbackData.substring("SCHEDULE_DIVISION_".length()));
+                handleScheduleForDivision(chatId, userId, username, divisionTournamentId, bot);
+            } else if ("PLAYER_HELP".equals(callbackData)) {
+                handleHelp(chatId, userId, bot);
+            } else if ("PLAYER_CONFIG".equals(callbackData)) {
+                sendLanguageConfig(chatId, player, bot);
+            } else if ("PLAYER_COURTS".equals(callbackData)) {
+                handleCourtsSetup(chatId, player, bot);
+            } else if (callbackData.startsWith("COURT_SELECT_")) {
+                String court = callbackData.substring("COURT_SELECT_".length());
+                handleCourtSelection(chatId, player, court, bot);
+            } else if ("COURT_FINISH".equals(callbackData)) {
+                handleCourtFinish(chatId, player, bot);
+            } else if ("LANG_RU".equals(callbackData)) {
+                if (player != null) {
+                    playerService.updateLanguage(player, Language.RU);
+                }
+                bot.sendMessage(chatId, localizationService.msg(player, "config.language.updated", "Russian"));
+                handleStartCommand(chatId, userId, bot);
+            } else if ("LANG_EN".equals(callbackData)) {
+                if (player != null) {
+                    playerService.updateLanguage(player, Language.EN);
+                }
+                bot.sendMessage(chatId, localizationService.msg(player, "config.language.updated", "English"));
+                handleStartCommand(chatId, userId, bot);
+            } else if (callbackData.startsWith("MANAGE_TOUR_")) {
+                Long tourId = Long.parseLong(callbackData.substring("MANAGE_TOUR_".length()));
+                handleManageTour(chatId, userId, username, tourId, bot);
+            } else if (callbackData.startsWith("VIEW_REQUESTS_ACCEPTED_")) {
+                Long tourId = Long.parseLong(callbackData.substring("VIEW_REQUESTS_ACCEPTED_".length()));
+                handleViewRequests(chatId, userId, username, tourId, bot, true);
+            } else if (callbackData.startsWith("VIEW_REQUESTS_ALL_")) {
+                Long tourId = Long.parseLong(callbackData.substring("VIEW_REQUESTS_ALL_".length()));
+                handleViewRequests(chatId, userId, username, tourId, bot, false);
+            } else if (callbackData.startsWith("VIEW_REQUESTS_")) {
+                Long tourId = Long.parseLong(callbackData.substring("VIEW_REQUESTS_".length()));
+                handleViewRequests(chatId, userId, username, tourId, bot, false);
+            } else if (callbackData.startsWith("ACCEPT_REQUEST_")) {
+                Long requestId = Long.parseLong(callbackData.substring("ACCEPT_REQUEST_".length()));
+                handleAcceptRequest(chatId, userId, username, requestId, bot);
+            } else if (callbackData.startsWith("DECLINE_REQUEST_")) {
+                Long requestId = Long.parseLong(callbackData.substring("DECLINE_REQUEST_".length()));
+                handleDeclineRequest(chatId, userId, username, requestId, bot);
+            } else if (callbackData.startsWith("CANCEL_REQUEST_")) {
+                Long requestId = Long.parseLong(callbackData.substring("CANCEL_REQUEST_".length()));
+                handleCancelRequest(chatId, userId, username, requestId, bot);
+            } else if (callbackData.startsWith("CHANGE_TO_ACCEPT_")) {
+                Long requestId = Long.parseLong(callbackData.substring("CHANGE_TO_ACCEPT_".length()));
+                handleChangeRequestStatus(chatId, userId, username, requestId, ScheduleRequest.ScheduleStatus.Accepted, bot);
+            } else if (callbackData.startsWith("CHANGE_TO_DECLINE_")) {
+                Long requestId = Long.parseLong(callbackData.substring("CHANGE_TO_DECLINE_".length()));
+                handleChangeRequestStatus(chatId, userId, username, requestId, ScheduleRequest.ScheduleStatus.Declined, bot);
+            } else if (callbackData.startsWith("COMPLETE_TOUR_")) {
+                Long tourId = Long.parseLong(callbackData.substring("COMPLETE_TOUR_".length()));
+                handleCompleteTour(chatId, userId, username, tourId, bot);
+            } else if (callbackData.startsWith("POSTPONE_TOUR_")) {
+                Long tourId = Long.parseLong(callbackData.substring("POSTPONE_TOUR_".length()));
+                handlePostponeTour(chatId, userId, username, tourId, bot);
+            } else if (callbackData.startsWith("CONFIRM_COMPLETE_")) {
+                Long tourId = Long.parseLong(callbackData.substring("CONFIRM_COMPLETE_".length()));
+                confirmCompleteTour(chatId, userId, username, tourId, bot);
+            } else if (callbackData.startsWith("CONFIRM_POSTPONE_")) {
+                Long tourId = Long.parseLong(callbackData.substring("CONFIRM_POSTPONE_".length()));
+                confirmPostponeTour(chatId, userId, username, tourId, bot);
             }
-            bot.sendMessage(chatId, localizationService.msg(player, "config.language.updated", "Russian"));
-            handleStartCommand(chatId, userId, bot);
-        } else if ("LANG_EN".equals(callbackData)) {
-            if (player != null) {
-                playerService.updateLanguage(player, Language.EN);
-            }
-            bot.sendMessage(chatId, localizationService.msg(player, "config.language.updated", "English"));
-            handleStartCommand(chatId, userId, bot);
-        } else if (callbackData.startsWith("MANAGE_TOUR_")) {
-            Long tourId = Long.parseLong(callbackData.substring("MANAGE_TOUR_".length()));
-            handleManageTour(chatId, userId, username, tourId, bot);
-        } else if (callbackData.startsWith("VIEW_REQUESTS_ACCEPTED_")) {
-            Long tourId = Long.parseLong(callbackData.substring("VIEW_REQUESTS_ACCEPTED_".length()));
-            handleViewRequests(chatId, userId, username, tourId, bot, true);
-        } else if (callbackData.startsWith("VIEW_REQUESTS_ALL_")) {
-            Long tourId = Long.parseLong(callbackData.substring("VIEW_REQUESTS_ALL_".length()));
-            handleViewRequests(chatId, userId, username, tourId, bot, false);
-        } else if (callbackData.startsWith("VIEW_REQUESTS_")) {
-            Long tourId = Long.parseLong(callbackData.substring("VIEW_REQUESTS_".length()));
-            handleViewRequests(chatId, userId, username, tourId, bot, false);
-        } else if (callbackData.startsWith("ACCEPT_REQUEST_")) {
-            Long requestId = Long.parseLong(callbackData.substring("ACCEPT_REQUEST_".length()));
-            handleAcceptRequest(chatId, userId, username, requestId, bot);
-        } else if (callbackData.startsWith("DECLINE_REQUEST_")) {
-            Long requestId = Long.parseLong(callbackData.substring("DECLINE_REQUEST_".length()));
-            handleDeclineRequest(chatId, userId, username, requestId, bot);
-        } else if (callbackData.startsWith("CANCEL_REQUEST_")) {
-            Long requestId = Long.parseLong(callbackData.substring("CANCEL_REQUEST_".length()));
-            handleCancelRequest(chatId, userId, username, requestId, bot);
-        } else if (callbackData.startsWith("CHANGE_TO_ACCEPT_")) {
-            Long requestId = Long.parseLong(callbackData.substring("CHANGE_TO_ACCEPT_".length()));
-            handleChangeRequestStatus(chatId, userId, username, requestId, ScheduleRequest.ScheduleStatus.Accepted, bot);
-        } else if (callbackData.startsWith("CHANGE_TO_DECLINE_")) {
-            Long requestId = Long.parseLong(callbackData.substring("CHANGE_TO_DECLINE_".length()));
-            handleChangeRequestStatus(chatId, userId, username, requestId, ScheduleRequest.ScheduleStatus.Declined, bot);
-        } else if (callbackData.startsWith("COMPLETE_TOUR_")) {
-            Long tourId = Long.parseLong(callbackData.substring("COMPLETE_TOUR_".length()));
-            handleCompleteTour(chatId, userId, username, tourId, bot);
-        } else if (callbackData.startsWith("POSTPONE_TOUR_")) {
-            Long tourId = Long.parseLong(callbackData.substring("POSTPONE_TOUR_".length()));
-            handlePostponeTour(chatId, userId, username, tourId, bot);
-        } else if (callbackData.startsWith("CONFIRM_COMPLETE_")) {
-            Long tourId = Long.parseLong(callbackData.substring("CONFIRM_COMPLETE_".length()));
-            confirmCompleteTour(chatId, userId, username, tourId, bot);
-        } else if (callbackData.startsWith("CONFIRM_POSTPONE_")) {
-            Long tourId = Long.parseLong(callbackData.substring("CONFIRM_POSTPONE_".length()));
-            confirmPostponeTour(chatId, userId, username, tourId, bot);
+        } finally {
+            PlayerContextHolder.clear();
         }
     }
 

@@ -1,10 +1,12 @@
 package com.raketo.league.model;
 
+import com.raketo.league.audit.AuditEntityListener;
 import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
 @Table(name = "players")
+@EntityListeners(AuditEntityListener.class)
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
