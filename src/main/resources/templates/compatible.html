@@ -265,13 +265,15 @@
 
     <div style="margin-bottom: 16px; text-align: center;">
         <button id="toggle-early-hours" style="padding: 8px 16px; background-color: var(--tg-theme-button-color, #007bff); color: var(--tg-theme-button-text-color, #ffffff); border: none; border-radius: 4px; cursor: pointer;" th:text="#{web.compatible.toggle.show}">Show 00:00-07:00</button>
+        <button id="toggle-view" style="padding: 8px 16px; background-color: var(--tg-theme-button-color, #007bff); color: var(--tg-theme-button-text-color, #ffffff); border: none; border-radius: 4px; cursor: pointer; margin-left: 8px;" th:text="#{web.compatible.show.few}">Show 1-4 Days</button>
     </div>
 
     <div class="calendar-container">
         <div class="week-selector">
-            <button id="nav-left">←</button>
+            <button id="scroll-nav-btn">→</button>
             <span id="week-display">Loading...</span>
-            <button id="nav-right">→</button>
+            <button id="prev-week" style="display:none;">←</button>
+            <button id="next-week" style="display:none;">→</button>
         </div>
 
         <div class="calendar-grid">
@@ -339,11 +341,8 @@
         const tourStart = tourStartDate ? new Date(tourStartDate) : null;
         const tourEnd = tourEndDate ? new Date(tourEndDate) : null;
 
-        document.getElementById('prev-week').addEventListener('click', () => changeWeek(-1));
-        document.getElementById('next-week').addEventListener('click', () => changeWeek(1));
-        document.getElementById('prev-day').addEventListener('click', () => changeDay(-1));
-        document.getElementById('next-day').addEventListener('click', () => changeDay(1));
-        document.getElementById('show-all-days').addEventListener('click', toggleShowAllDays);
+        document.getElementById('scroll-nav-btn').addEventListener('click', handleScrollNav);
+        document.getElementById('toggle-view').addEventListener('click', toggleView);
         document.getElementById('toggle-early-hours').addEventListener('click', toggleEarlyHours);
 
         document.addEventListener('mouseup', () => {
@@ -366,17 +365,27 @@
             }
         });
 
-        function toggleShowAllDays() {
+        function toggleView() {
             showAllDays = !showAllDays;
-            document.getElementById('show-all-days').textContent = showAllDays ? MSG_SHOW_FEW : MSG_SHOW_WEEK;
+            const btn = document.getElementById('toggle-view');
+            btn.textContent = showAllDays ? MSG_SHOW_FEW : MSG_SHOW_WEEK;
+            currentDayIndex = 0;
             renderCalendar();
         }
 
-        function changeDay(offset) {
-            currentDayIndex += offset;
-            if (currentDayIndex < 0) currentDayIndex = 0;
-            if (currentDayIndex >= weekDates.length) currentDayIndex = weekDates.length - 1;
-            renderCalendar();
+        function handleScrollNav() {
+            if (showAllDays) {
+                // Navigate weeks
+                const direction = scrollButtonSide === 'right' ? 1 : -1;
+                changeWeek(direction);
+            } else {
+                // Navigate days
+                const direction = scrollButtonSide === 'right' ? 4 : -4;
+                currentDayIndex += direction;
+                if (currentDayIndex < 0) currentDayIndex = 0;
+                if (currentDayIndex >= weekDates.length) currentDayIndex = weekDates.length - 1;
+                renderCalendar();
+            }
         }
 
         function toggleEarlyHours() {
@@ -441,18 +450,21 @@
                 const endIndex = Math.min(currentDayIndex + 4, weekDates.length);
                 displayDates = weekDates.slice(currentDayIndex, endIndex);
 
-                if (displayDates.length === 1) {
-                    const dn = DAY_NAMES[displayDates[0].getDay() === 0 ? 6 : displayDates[0].getDay()-1];
-                    document.getElementById('day-display').textContent = `${dn} ${formatDate(displayDates[0])}`;
+                // Determine scroll button position
+                if (currentDayIndex + 4 >= weekDates.length) {
+                    scrollButtonSide = 'left';
                 } else {
-                    const startDn = DAY_NAMES[displayDates[0].getDay() === 0 ? 6 : displayDates[0].getDay()-1];
-                    const endDn = DAY_NAMES[displayDates[displayDates.length-1].getDay() === 0 ? 6 : displayDates[displayDates.length-1].getDay()-1];
-                    document.getElementById('day-display').textContent = `${startDn} - ${endDn}`;
+                    scrollButtonSide = 'right';
                 }
-
-                document.getElementById('prev-day').disabled = currentDayIndex === 0;
-                document.getElementById('next-day').disabled = currentDayIndex >= weekDates.length - 1;
+            } else {
+                // For week view, always show right side
+                scrollButtonSide = 'right';
             }
+
+            // Update scroll button
+            const scrollBtn = document.getElementById('scroll-nav-btn');
+            scrollBtn.textContent = scrollButtonSide === 'right' ? '→' : '←';
+            scrollBtn.style.order = scrollButtonSide === 'right' ? '2' : '0';
 
             const header = document.getElementById('calendar-header');
             const body = document.getElementById('calendar-body');
@@ -573,7 +585,6 @@
                 body.appendChild(row);
             }
 
-            updateWeekButtons();
             updateSendButton();
         }
 
@@ -582,26 +593,6 @@
             document.getElementById('send-button').disabled = !hasSelections;
         }
 
-        function updateWeekButtons() {
-            const prevBtn = document.getElementById('prev-week');
-            const nextBtn = document.getElementById('next-week');
-
-            if (tourStart && tourEnd) {
-                const monday = getMonday(currentWeekStart);
-                const prevMonday = new Date(monday);
-                prevMonday.setDate(prevMonday.getDate() - 7);
-
-                const sunday = new Date(monday);
-                sunday.setDate(sunday.getDate() + 6);
-                const nextMonday = new Date(monday);
-                nextMonday.setDate(nextMonday.getDate() + 7);
-                const nextSunday = new Date(nextMonday);
-                nextSunday.setDate(nextSunday.getDate() + 6);
-
-                prevBtn.disabled = prevMonday < tourStart;
-                nextBtn.disabled = nextSunday > tourEnd;
-            }
-        }
 
         async function loadCompatibility(){
             if (!playerId || !opponentId || !tourId) {

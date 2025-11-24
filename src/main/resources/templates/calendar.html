@@ -185,12 +185,51 @@
             width: 100%;
             height: 30px;
             padding: 2px;
-            background-color: var(--tg-theme-button-color, #007bff);
-            color: var(--tg-theme-button-text-color, #ffffff);
             border: 1px solid #ddd;
             cursor: pointer;
             font-size: 16px;
             line-height: 1;
+            font-weight: bold;
+        }
+
+        .hour-btn.red {
+            background-color: #f44336;
+            color: #fff;
+        }
+
+        .hour-btn.green {
+            background-color: #4caf50;
+            color: #fff;
+        }
+
+        .hour-btn.yellow {
+            background-color: #ffeb3b;
+            color: #000;
+        }
+
+        .cycle-btn {
+            padding: 4px 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: bold;
+            min-width: 30px;
+        }
+
+        .cycle-btn.red {
+            background-color: #f44336;
+            color: #fff;
+        }
+
+        .cycle-btn.green {
+            background-color: #4caf50;
+            color: #fff;
+        }
+
+        .cycle-btn.yellow {
+            background-color: #ffeb3b;
+            color: #000;
         }
 
         .time-slot {
@@ -273,13 +312,13 @@
 
     <div style="margin-bottom: 16px; text-align: center;">
         <button id="toggle-early-hours" style="padding: 8px 16px; background-color: var(--tg-theme-button-color, #007bff); color: var(--tg-theme-button-text-color, #ffffff); border: none; border-radius: 4px; cursor: pointer;" th:text="#{web.calendar.toggle.show}">Show 00:00-07:00</button>
+        <button id="toggle-view" style="padding: 8px 16px; background-color: var(--tg-theme-button-color, #007bff); color: var(--tg-theme-button-text-color, #ffffff); border: none; border-radius: 4px; cursor: pointer; margin-left: 8px;" th:text="#{web.calendar.show.few}">Show 1-4 Days</button>
     </div>
 
     <div class="calendar-container">
         <div class="week-selector">
-            <button id="nav-left">←</button>
+            <button id="scroll-nav-btn">→</button>
             <span id="week-display">Loading...</span>
-            <button id="nav-right">→</button>
         </div>
 
         <div class="calendar-grid">
@@ -346,11 +385,8 @@
         const tourStart = tourStartDate ? new Date(tourStartDate) : null;
         const tourEnd = tourEndDate ? new Date(tourEndDate) : null;
 
-        document.getElementById('nav-left').addEventListener('click', () => changeWeek(-1));
-        document.getElementById('nav-right').addEventListener('click', () => changeWeek(1));
-        document.getElementById('prev-day').addEventListener('click', () => changeDay(-1));
-        document.getElementById('next-day').addEventListener('click', () => changeDay(1));
-        document.getElementById('show-all-days').addEventListener('click', toggleShowAllDays);
+        document.getElementById('scroll-nav-btn').addEventListener('click', handleScrollNav);
+        document.getElementById('toggle-view').addEventListener('click', toggleView);
         document.getElementById('toggle-early-hours').addEventListener('click', toggleEarlyHours);
 
         document.addEventListener('mouseup', () => {
@@ -373,17 +409,27 @@
             }
         });
 
-        function toggleShowAllDays() {
+        function toggleView() {
             showAllDays = !showAllDays;
-            document.getElementById('show-all-days').textContent = showAllDays ? MSG_SHOW_FEW : MSG_SHOW_WEEK;
+            const btn = document.getElementById('toggle-view');
+            btn.textContent = showAllDays ? MSG_SHOW_FEW : MSG_SHOW_WEEK;
+            currentDayIndex = 0;
             renderCalendar();
         }
 
-        function changeDay(offset) {
-            currentDayIndex += offset;
-            if (currentDayIndex < 0) currentDayIndex = 0;
-            if (currentDayIndex >= weekDates.length) currentDayIndex = weekDates.length - 1;
-            renderCalendar();
+        function handleScrollNav() {
+            if (showAllDays) {
+                // Navigate weeks
+                const direction = scrollButtonSide === 'right' ? 1 : -1;
+                changeWeek(direction);
+            } else {
+                // Navigate days
+                const direction = scrollButtonSide === 'right' ? 4 : -4;
+                currentDayIndex += direction;
+                if (currentDayIndex < 0) currentDayIndex = 0;
+                if (currentDayIndex >= weekDates.length) currentDayIndex = weekDates.length - 1;
+                renderCalendar();
+            }
         }
 
         function toggleEarlyHours() {
@@ -497,34 +543,35 @@
                 const endIndex = Math.min(currentDayIndex + 4, weekDates.length);
                 displayDates = weekDates.slice(currentDayIndex, endIndex);
 
-                if (displayDates.length === 1) {
-                    const dn = DAY_NAMES[displayDates[0].getDay() === 0 ? 6 : displayDates[0].getDay()-1];
-                    document.getElementById('day-display').textContent = `${dn} ${formatDate(displayDates[0])}`;
+                // Determine scroll button position
+                if (currentDayIndex + 4 >= weekDates.length) {
+                    scrollButtonSide = 'left';
                 } else {
-                    const startDn = DAY_NAMES[displayDates[0].getDay() === 0 ? 6 : displayDates[0].getDay()-1];
-                    const endDn = DAY_NAMES[displayDates[displayDates.length-1].getDay() === 0 ? 6 : displayDates[displayDates.length-1].getDay()-1];
-                    document.getElementById('day-display').textContent = `${startDn} - ${endDn}`;
+                    scrollButtonSide = 'right';
                 }
-
-                document.getElementById('prev-day').disabled = currentDayIndex === 0;
-                document.getElementById('next-day').disabled = currentDayIndex >= weekDates.length - 1;
+            } else {
+                // For week view, always show right side
+                scrollButtonSide = 'right';
             }
+
+            // Update scroll button
+            const scrollBtn = document.getElementById('scroll-nav-btn');
+            scrollBtn.textContent = scrollButtonSide === 'right' ? '→' : '←';
+            scrollBtn.style.order = scrollButtonSide === 'right' ? '2' : '0';
 
             const header = document.getElementById('calendar-header');
             const body = document.getElementById('calendar-body');
 
-            let headerHtml = '<tr><th class="time-header"></th>';
+            let headerHtml = '<tr><th class="time-header"></th><th class="time-header">⏱️</th>';
             displayDates.forEach((d, idx) => {
                 const actualIdx = showAllDays ? idx : currentDayIndex + idx;
                 const dayName = DAY_NAMES[d.getDay() === 0 ? 6 : d.getDay()-1];
                 headerHtml += `<th>
                     ${dayName}<br/>${formatDate(d)}<br/>
-                    <div style="margin-top: 4px; display: flex; gap: 2px; justify-content: center;">
-                        <button class="day-toggle-btn" data-day-index="${actualIdx}" style="padding: 2px 6px; font-size: 10px; background: #f44336; color: white; border: none; border-radius: 3px; cursor: pointer;">R</button>
-                    </div>
+                    <button class="cycle-btn day-toggle-btn red" data-day-index="${actualIdx}">🔴</button>
                 </th>`;
             });
-            headerHtml += `<th class="hour-control-header"></th></tr>`;
+            headerHtml += '</tr>';
             header.innerHTML = headerHtml;
 
             body.innerHTML = '';
@@ -540,11 +587,11 @@
 
                 const rowToggleCell = document.createElement('td');
                 rowToggleCell.className = 'time-label';
+                rowToggleCell.style.padding = '2px';
                 const rowToggleBtn = document.createElement('button');
-                rowToggleBtn.className = 'hour-btn row-toggle-btn';
+                rowToggleBtn.className = 'cycle-btn hour-btn row-toggle-btn red';
                 rowToggleBtn.dataset.hour = hour;
-                rowToggleBtn.style.backgroundColor = '#f44336';
-                rowToggleBtn.textContent = 'R';
+                rowToggleBtn.textContent = '🔴';
                 rowToggleCell.appendChild(rowToggleBtn);
                 row.appendChild(rowToggleCell);
 
@@ -660,15 +707,23 @@
                 btn.onclick = () => {
                     const dayIndex = parseInt(btn.dataset.dayIndex, 10);
                     const state = btn.dataset.state;
-                    const color = state === 'red' ? 'red' : state === 'green' ? 'green' : 'yellow';
-                    const nextState = state === 'red' ? 'green' : state === 'green' ? 'yellow' : 'red';
-                    btn.dataset.state = nextState;
-                    btn.style.backgroundColor = color === 'red' ? '#f44336' : color === 'green' ? '#4caf50' : '#ffeb3b';
+
+                    // Apply current state color to all hours
+                    const color = state;
                     const targetDate = weekDates[dayIndex];
                     for (let hour = 0; hour <= 23; hour++) {
                         const key = getSlotKey(targetDate, hour);
                         slots[key] = color;
                     }
+
+                    // Cycle to next state
+                    const nextState = state === 'red' ? 'green' : state === 'green' ? 'yellow' : 'red';
+                    btn.dataset.state = nextState;
+
+                    // Update button appearance
+                    btn.className = `cycle-btn day-toggle-btn ${nextState}`;
+                    btn.textContent = nextState === 'red' ? '🔴' : nextState === 'green' ? '🟢' : '🟡';
+
                     renderCalendar();
                 };
             });
@@ -679,17 +734,118 @@
                 btn.onclick = () => {
                     const hour = parseInt(btn.dataset.hour, 10);
                     const state = btn.dataset.state;
-                    const color = state === 'red' ? 'red' : state === 'green' ? 'green' : 'yellow';
-                    const nextState = state === 'red' ? 'green' : state === 'green' ? 'yellow' : 'red';
-                    btn.dataset.state = nextState;
-                    btn.style.backgroundColor = color === 'red' ? '#f44336' : color === 'green' ? '#4caf50' : '#ffeb3b';
+
+                    // Apply current state color to visible days only
+                    const color = state;
                     displayDates.forEach(date => {
                         const key = getSlotKey(date, hour);
                         slots[key] = color;
                     });
+
+                    // Cycle to next state
+                    const nextState = state === 'red' ? 'green' : state === 'green' ? 'yellow' : 'red';
+                    btn.dataset.state = nextState;
+
+                    // Update button appearance
+                    btn.className = `cycle-btn hour-btn row-toggle-btn ${nextState}`;
+                    btn.textContent = nextState === 'red' ? '🔴' : nextState === 'green' ? '🟢' : '🟡';
+
                     renderCalendar();
                 };
             });
+        }
+
+        async function loadExisting() {
+            try {
+                // Try to load availability for current tour
+                const res = await fetch(`/api/availability/tour/${tourId}/player/${playerId}`);
+                if (!res.ok) {
+                    console.log('No availability found for current tour');
+                    return await loadClosestTourOrDefault();
+                }
+
+                const data = await res.json();
+                if (!data || (!data.availableSlots && !data.unavailableSlots)) {
+                    console.log('Empty availability data for current tour');
+                    return await loadClosestTourOrDefault();
+                }
+
+                // Load existing availability for this tour
+                const available = data.availableSlots ? JSON.parse(data.availableSlots) : {};
+                const unavailable = data.unavailableSlots ? JSON.parse(data.unavailableSlots) : {};
+
+                Object.entries(available).forEach(([day, hours]) => {
+                    const [d, m, y] = day.split('-');
+                    hours.forEach(hour => {
+                        const date = new Date(y, m - 1, d);
+                        const key = getSlotKey(date, hour);
+                        slots[key] = 'green';
+                    });
+                });
+
+                Object.entries(unavailable).forEach(([day, hours]) => {
+                    const [d, m, y] = day.split('-');
+                    hours.forEach(hour => {
+                        const date = new Date(y, m - 1, d);
+                        const key = getSlotKey(date, hour);
+                        slots[key] = 'red';
+                    });
+                });
+
+                console.log('Loaded availability for current tour');
+                return true;
+            } catch (e) {
+                console.error('Error loading availability:', e);
+                return await loadClosestTourOrDefault();
+            }
+        }
+
+        async function loadClosestTourOrDefault() {
+            try {
+                // Try to get availability from any other tour for this player
+                const res = await fetch(`/api/availability/player/${playerId}/closest?excludeTourId=${tourId}`);
+
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data && (data.availableSlots || data.unavailableSlots)) {
+                        console.log('Found closest tour availability, copying...');
+
+                        // Copy availability pattern to current tour dates
+                        const available = data.availableSlots ? JSON.parse(data.availableSlots) : {};
+                        const unavailable = data.unavailableSlots ? JSON.parse(data.unavailableSlots) : {};
+
+                        // Get hour patterns from any day
+                        const greenHours = new Set();
+                        const redHours = new Set();
+
+                        Object.values(available).forEach(hours => hours.forEach(h => greenHours.add(h)));
+                        Object.values(unavailable).forEach(hours => hours.forEach(h => redHours.add(h)));
+
+                        // Apply pattern to all days in current tour
+                        for (let d = new Date(tourStart); d <= tourEnd; d.setDate(d.getDate() + 1)) {
+                            for (let hour = 0; hour <= 23; hour++) {
+                                const key = getSlotKey(d, hour);
+                                if (greenHours.has(hour)) {
+                                    slots[key] = 'green';
+                                } else if (redHours.has(hour)) {
+                                    slots[key] = 'red';
+                                } else {
+                                    slots[key] = 'yellow';
+                                }
+                            }
+                        }
+
+                        return true;
+                    }
+                }
+            } catch (e) {
+                console.log('No closest tour found or error:', e);
+            }
+
+            // No data found anywhere, use defaults
+            console.log('Using default availability pattern');
+            setPresetTimes();
+            return false;
         }
 
         document.getElementById('save-button').addEventListener('click', async () => {

@@ -110,6 +110,16 @@ public class AvailabilityService {
         return result;
     }
 
+    @Transactional(readOnly = true)
+    public Optional<AvailabilitySlot> getClosestTourAvailability(Long playerId, Long excludeTourId) {
+        List<AvailabilitySlot> playerSlots = availabilitySlotRepository.findByPlayerId(playerId);
+
+        return playerSlots.stream()
+                .filter(slot -> !slot.getTour().getId().equals(excludeTourId))
+                .filter(slot -> slot.getAvailableSlots() != null || slot.getUnavailableSlots() != null)
+                .findFirst();
+    }
+
     private List<TimeIntersection> computeGreenIntersections(String availA, String availB) {
         Map<String, List<Integer>> greenA = parse(availA);
         Map<String, List<Integer>> greenB = parse(availB);
@@ -186,7 +196,7 @@ public class AvailabilityService {
         if (raw.isEmpty()) return raw;
         List<TimeIntersection> sorted = raw.stream().sorted(Comparator.comparing(TimeIntersection::start)).toList();
         List<TimeIntersection> merged = new ArrayList<>();
-        TimeIntersection current = sorted.getFirst();
+        TimeIntersection current = sorted.get(0);
         for (int i = 1; i < sorted.size(); i++) {
             TimeIntersection next = sorted.get(i);
             if (!current.end.isBefore(next.start) && current.type.equals(next.type)) {

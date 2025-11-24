@@ -48,6 +48,16 @@ public class AvailabilityController {
         return ResponseEntity.ok(availabilityService.getCompatibleTimes(tourId, playerId, opponentId));
     }
 
+    @GetMapping("/player/{playerId}/closest")
+    public ResponseEntity<AvailabilitySlot> getClosestTourAvailability(
+            @PathVariable Long playerId,
+            @RequestParam(required = false) Long excludeTourId) {
+        if (excludeTourId == null) {
+            return ResponseEntity.ok(availabilityService.getPlayerAvailability(playerId).stream().findFirst().orElse(null));
+        }
+        return ResponseEntity.ok(availabilityService.getClosestTourAvailability(playerId, excludeTourId).orElse(null));
+    }
+
     @Data
     public static class AvailabilityPayload {
         private String availableSlots;
