@@ -377,6 +377,11 @@
         let showAllDays = !isMobileView;
         let scrollButtonSide = 'right';
 
+        // Set initial button text correctly
+        if (!showAllDays) {
+            document.getElementById('toggle-view').textContent = MSG_SHOW_WEEK;
+        }
+
         const startHour = 0;
         const endHour = 23;
         const visibleStartHour = 8;
@@ -448,7 +453,8 @@
                 const newSunday = new Date(newMonday);
                 newSunday.setDate(newSunday.getDate() + 6);
 
-                if (newMonday < tourStart || newSunday > tourEnd) {
+                // Allow navigation if week has any overlap with tour dates
+                if (newSunday < tourStart || newMonday > tourEnd) {
                     return;
                 }
             }
@@ -539,25 +545,56 @@
             document.getElementById('week-display').textContent = weekDisplay;
 
             let displayDates = weekDates;
+            let canScrollRight = false;
+            let canScrollLeft = false;
+
             if (isMobileView && !showAllDays) {
+                // Day view - check if we can scroll within current week
                 const endIndex = Math.min(currentDayIndex + 4, weekDates.length);
                 displayDates = weekDates.slice(currentDayIndex, endIndex);
 
-                // Determine scroll button position
-                if (currentDayIndex + 4 >= weekDates.length) {
+                canScrollLeft = currentDayIndex > 0;
+                canScrollRight = currentDayIndex + 4 < weekDates.length;
+
+                // Determine scroll button position and visibility
+                if (!canScrollRight && canScrollLeft) {
                     scrollButtonSide = 'left';
                 } else {
                     scrollButtonSide = 'right';
                 }
             } else {
-                // For week view, always show right side
-                scrollButtonSide = 'right';
+                // Week view - check if we can navigate to other weeks
+                const monday = getMonday(currentWeekStart);
+
+                // Check if we can go to previous week
+                const prevWeekMonday = new Date(monday);
+                prevWeekMonday.setDate(prevWeekMonday.getDate() - 7);
+                const prevWeekSunday = new Date(prevWeekMonday);
+                prevWeekSunday.setDate(prevWeekSunday.getDate() + 6);
+                canScrollLeft = tourStart && tourEnd && !(prevWeekSunday < tourStart);
+
+                // Check if we can go to next week
+                const nextWeekMonday = new Date(monday);
+                nextWeekMonday.setDate(nextWeekMonday.getDate() + 7);
+                canScrollRight = tourStart && tourEnd && !(nextWeekMonday > tourEnd);
+
+                // Determine scroll button position
+                if (!canScrollRight && canScrollLeft) {
+                    scrollButtonSide = 'left';
+                } else {
+                    scrollButtonSide = 'right';
+                }
             }
 
-            // Update scroll button
+            // Update scroll button visibility and appearance
             const scrollBtn = document.getElementById('scroll-nav-btn');
-            scrollBtn.textContent = scrollButtonSide === 'right' ? '→' : '←';
-            scrollBtn.style.order = scrollButtonSide === 'right' ? '2' : '0';
+            if (canScrollLeft || canScrollRight) {
+                scrollBtn.style.display = '';
+                scrollBtn.textContent = scrollButtonSide === 'right' ? '→' : '←';
+                scrollBtn.style.order = scrollButtonSide === 'right' ? '2' : '0';
+            } else {
+                scrollBtn.style.display = 'none';
+            }
 
             const header = document.getElementById('calendar-header');
             const body = document.getElementById('calendar-body');
@@ -703,14 +740,34 @@
         function setupDayAndHourToggleHandlers(displayDates, displayStartHour) {
             const dayButtons = document.querySelectorAll('.day-toggle-btn');
             dayButtons.forEach(btn => {
-                btn.dataset.state = 'red';
+                // Initialize state based on most common color in the day (if data exists)
+                const dayIndex = parseInt(btn.dataset.dayIndex, 10);
+                const targetDate = weekDates[dayIndex];
+                const dayColors = {};
+                for (let hour = 0; hour <= 23; hour++) {
+                    const key = getSlotKey(targetDate, hour);
+                    const color = slots[key] || 'yellow';
+                    dayColors[color] = (dayColors[color] || 0) + 1;
+                }
+                // Determine most common color or default to red
+                let currentState = 'red';
+                let maxCount = 0;
+                Object.entries(dayColors).forEach(([color, count]) => {
+                    if (count > maxCount) {
+                        maxCount = count;
+                        currentState = color;
+                    }
+                });
+
+                btn.dataset.state = currentState;
+                btn.className = `cycle-btn day-toggle-btn ${currentState}`;
+                btn.textContent = currentState === 'red' ? '🔴' : currentState === 'green' ? '🟢' : '🟡';
+
                 btn.onclick = () => {
-                    const dayIndex = parseInt(btn.dataset.dayIndex, 10);
                     const state = btn.dataset.state;
 
                     // Apply current state color to all hours
                     const color = state;
-                    const targetDate = weekDates[dayIndex];
                     for (let hour = 0; hour <= 23; hour++) {
                         const key = getSlotKey(targetDate, hour);
                         slots[key] = color;
@@ -730,9 +787,29 @@
 
             const rowButtons = document.querySelectorAll('.row-toggle-btn');
             rowButtons.forEach(btn => {
-                btn.dataset.state = 'red';
+                // Initialize state based on most common color in the hour row (for visible days)
+                const hour = parseInt(btn.dataset.hour, 10);
+                const rowColors = {};
+                displayDates.forEach(date => {
+                    const key = getSlotKey(date, hour);
+                    const color = slots[key] || 'yellow';
+                    rowColors[color] = (rowColors[color] || 0) + 1;
+                });
+                // Determine most common color or default to red
+                let currentState = 'red';
+                let maxCount = 0;
+                Object.entries(rowColors).forEach(([color, count]) => {
+                    if (count > maxCount) {
+                        maxCount = count;
+                        currentState = color;
+                    }
+                });
+
+                btn.dataset.state = currentState;
+                btn.className = `cycle-btn hour-btn row-toggle-btn ${currentState}`;
+                btn.textContent = currentState === 'red' ? '🔴' : currentState === 'green' ? '🟢' : '🟡';
+
                 btn.onclick = () => {
-                    const hour = parseInt(btn.dataset.hour, 10);
                     const state = btn.dataset.state;
 
                     // Apply current state color to visible days only
