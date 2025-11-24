@@ -306,6 +306,23 @@ web:
     toggle:
       show: "Show 00:00-07:59"
       hide: "Hide 00:00-07:59"
+    show:
+      week: "Show Week"
+      few: "Show 1-4 Days"
+    controls:
+      all: "All"
+    hour:
+      cycle:
+        title: "Cycle this hour for all days"
+    day:
+      short:
+        mon: "Mon"
+        tue: "Tue"
+        wed: "Wed"
+        thu: "Thu"
+        fri: "Fri"
+        sat: "Sat"
+        sun: "Sun"
     week:
       previous: "← Previous"
       next: "Next →"

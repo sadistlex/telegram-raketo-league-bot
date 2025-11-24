@@ -309,6 +309,23 @@ web:
     toggle:
       show: "Показать 00:00-07:59"
       hide: "Скрыть 00:00-07:59"
+    show:
+      week: "Показать неделю"
+      few: "Показать 1-4 дня"
+    controls:
+      all: "Все"
+    hour:
+      cycle:
+        title: "Применить это время ко всем дням"
+    day:
+      short:
+        mon: "Пн"
+        tue: "Вт"
+        wed: "Ср"
+        thu: "Чт"
+        fri: "Пт"
+        sat: "Сб"
+        sun: "Вс"
     week:
       previous: "← Предыдущая"
       next: "Следующая →"

@@ -303,9 +303,19 @@
 
         const MSG_TOGGLE_HIDE = /*[[#{web.compatible.toggle.hide}]]*/ 'Hide 00:00-07:00';
         const MSG_TOGGLE_SHOW = /*[[#{web.compatible.toggle.show}]]*/ 'Show 00:00-07:00';
-        const MSG_ALERT_NONE = /*[[#{web.compatible.alert.none}]]*/ 'No slots selected';
-        const MSG_ALERT_FAILED = /*[[#{web.compatible.alert.failed}]]*/ 'Failed to send request';
-        const MSG_ALERT_ERROR = /*[[#{web.compatible.alert.error}]]*/ 'Error';
+        const MSG_SHOW_WEEK = /*[[#{web.compatible.show.week}]]*/ 'Show Week';
+        const MSG_SHOW_FEW = /*[[#{web.compatible.show.few}]]*/ 'Show 1-4 Days';
+        const MSG_ALL = /*[[#{web.compatible.controls.all}]]*/ 'All';
+
+        const DAY_NAMES = [
+            /*[[#{web.compatible.day.short.mon}]]*/ 'Mon',
+            /*[[#{web.compatible.day.short.tue}]]*/ 'Tue',
+            /*[[#{web.compatible.day.short.wed}]]*/ 'Wed',
+            /*[[#{web.compatible.day.short.thu}]]*/ 'Thu',
+            /*[[#{web.compatible.day.short.fri}]]*/ 'Fri',
+            /*[[#{web.compatible.day.short.sat}]]*/ 'Sat',
+            /*[[#{web.compatible.day.short.sun}]]*/ 'Sun'
+        ];
 
         console.log('Compatible times initialized with:', { playerId, opponentId, tourId, tourStartDate, tourEndDate });
 
@@ -363,7 +373,7 @@
 
         function toggleShowAllDays() {
             showAllDays = !showAllDays;
-            document.getElementById('show-all-days').textContent = showAllDays ? 'Show 1-2 Days' : 'Show Week';
+            document.getElementById('show-all-days').textContent = showAllDays ? MSG_SHOW_FEW : MSG_SHOW_WEEK;
             renderCalendar();
         }
 
@@ -433,16 +443,16 @@
 
             let displayDates = weekDates;
             if (isMobileView && !showAllDays) {
-                const endIndex = Math.min(currentDayIndex + 2, weekDates.length);
+                const endIndex = Math.min(currentDayIndex + 4, weekDates.length);
                 displayDates = weekDates.slice(currentDayIndex, endIndex);
 
-                const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
                 if (displayDates.length === 1) {
-                    document.getElementById('day-display').textContent =
-                        `${dayNames[displayDates[0].getDay()]} ${formatDate(displayDates[0])}`;
+                    const dn = DAY_NAMES[displayDates[0].getDay() === 0 ? 6 : displayDates[0].getDay()-1];
+                    document.getElementById('day-display').textContent = `${dn} ${formatDate(displayDates[0])}`;
                 } else {
-                    document.getElementById('day-display').textContent =
-                        `${dayNames[displayDates[0].getDay()]} - ${dayNames[displayDates[displayDates.length-1].getDay()]}`;
+                    const startDn = DAY_NAMES[displayDates[0].getDay() === 0 ? 6 : displayDates[0].getDay()-1];
+                    const endDn = DAY_NAMES[displayDates[displayDates.length-1].getDay() === 0 ? 6 : displayDates[displayDates.length-1].getDay()-1];
+                    document.getElementById('day-display').textContent = `${startDn} - ${endDn}`;
                 }
 
                 document.getElementById('prev-day').disabled = currentDayIndex === 0;
@@ -454,7 +464,7 @@
 
             let headerHtml = '<tr><th class="time-header"></th>';
             displayDates.forEach((d) => {
-                const dayName = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][d.getDay() === 0 ? 6 : d.getDay()-1];
+                const dayName = DAY_NAMES[d.getDay() === 0 ? 6 : d.getDay()-1];
                 headerHtml += `<th>${dayName}<br/>${formatDate(d)}</th>`;
             });
             headerHtml += '</tr>';
@@ -468,7 +478,7 @@
                 const row = document.createElement('tr');
                 const timeCell = document.createElement('td');
                 timeCell.className = 'time-label';
-                timeCell.textContent = `${String(hour).padStart(2, '0')}:00`;
+                timeCell.textContent = `${String(hour).padStart(2, '0')}:00-${String(hour).padStart(2, '0')}:59`;
                 row.appendChild(timeCell);
 
                 displayDates.forEach(date => {
@@ -755,11 +765,11 @@
 
         if (tourStartDate) currentWeekStart = new Date(tourStartDate);
 
-        if (playerId && opponentId && tourId && tourStartDate && tourEndDate) {
-            loadCompatibility();
-        } else {
-            console.error('Cannot initialize compatible times - missing required parameters');
-        }
-    </script>
-</body>
-</html>
+         if (playerId && opponentId && tourId && tourStartDate && tourEndDate) {
+             loadCompatibility();
+         } else {
+             console.error('Cannot initialize compatible times - missing required parameters');
+         }
+     </script>
+ </body>
+ </html>
