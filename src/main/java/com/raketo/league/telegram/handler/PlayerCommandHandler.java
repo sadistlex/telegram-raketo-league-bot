@@ -18,8 +18,7 @@ import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKe
 import org.telegram.telegrambots.meta.api.objects.webapp.WebAppInfo;
 
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 @Component
 @RequiredArgsConstructor
@@ -88,6 +87,8 @@ public class PlayerCommandHandler {
                 handleCourtSelection(chatId, player, court, bot);
             } else if ("COURT_FINISH".equals(callbackData)) {
                 handleCourtFinish(chatId, player, bot);
+            } else if ("PLAYER_MENU".equals(callbackData)) {
+                handleStartCommand(chatId, userId, bot);
             } else if ("LANG_RU".equals(callbackData)) {
                 if (player != null) {
                     playerService.updateLanguage(player, Language.RU);
@@ -356,6 +357,11 @@ public class PlayerCommandHandler {
                 tourNumber++;
             }
         }
+        InlineKeyboardButton mainMenuBtn = InlineKeyboardButton.builder()
+                .text(localizationService.msg(player, "player.menu.back"))
+                .callbackData("PLAYER_MENU")
+                .build();
+        keyboard.add(List.of(mainMenuBtn));
         InlineKeyboardButton refresh = InlineKeyboardButton.builder()
                 .text(localizationService.msg(player, "player.schedule.refresh"))
                 .callbackData("PLAYER_SCHEDULE_REFRESH")
@@ -790,36 +796,39 @@ public class PlayerCommandHandler {
     }
 
     private void handleCourtsSetup(Long chatId, Player player, TelegramBot bot) {
-        showCourtsSelectionScreen(chatId, player, "", bot);
+        showCourtsSelectionScreen(chatId, player, bot);
     }
 
     private void handleCourtSelection(Long chatId, Player player, String court, TelegramBot bot) {
         String currentCourts = player.getPreferredCourts();
-        if (currentCourts == null) {
-            currentCourts = "";
+        if (currentCourts == null) currentCourts = "";
+
+        String[] parts = currentCourts.isEmpty() ? new String[0] : currentCourts.split(",");
+        for (String p : parts) {
+            if (p.equals(court)) {
+                showCourtsSelectionScreen(chatId, player, bot);
+                return;
+            }
         }
 
-        String newCourts;
-        if (currentCourts.isEmpty()) {
-            newCourts = court;
-        } else {
-            newCourts = currentCourts + "," + court;
-        }
+        String newCourts = currentCourts.isEmpty() ? court : currentCourts + "," + court;
 
-        player.setPreferredCourts(newCourts);
-        showCourtsSelectionScreen(chatId, player, newCourts, bot);
+        playerService.updatePreferredCourts(player, newCourts);
+
+        Player reloaded = playerService.findById(player.getId()).orElse(player);
+        showCourtsSelectionScreen(chatId, reloaded, bot);
     }
 
     private void handleCourtFinish(Long chatId, Player player, TelegramBot bot) {
-        playerService.updatePreferredCourts(player, player.getPreferredCourts());
         bot.sendMessage(chatId, localizationService.msg(player, "player.courts.setup.saved"));
         handleStartCommand(chatId, player.getTelegramId(), bot);
     }
 
-    private void showCourtsSelectionScreen(Long chatId, Player player, String currentSelection, TelegramBot bot) {
+    private void showCourtsSelectionScreen(Long chatId, Player player, TelegramBot bot) {
         StringBuilder message = new StringBuilder();
         message.append(localizationService.msg(player, "player.courts.setup.header"));
 
+        String currentSelection = player.getPreferredCourts();
         if (currentSelection == null || currentSelection.isEmpty()) {
             message.append(localizationService.msg(player, "player.courts.setup.none"));
         } else {
@@ -831,7 +840,15 @@ public class PlayerCommandHandler {
 
         List<List<InlineKeyboardButton>> keyboard = new ArrayList<>();
 
+        Set<String> chosen = new HashSet<>();
+        if (currentSelection != null && !currentSelection.isEmpty()) {
+            chosen.addAll(Arrays.asList(currentSelection.split(",")));
+        }
+
         for (Court court : Court.values()) {
+            if (chosen.contains(court.name())) {
+                continue;
+            }
             String buttonText = court == Court.OTHER
                 ? localizationService.msg(player, "player.courts.setup.other")
                 : court.getDisplayName();

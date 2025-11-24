@@ -2,9 +2,11 @@ player:
   menu:
     welcome: "Welcome to Raketo League Bot!\n\nUse the buttons below to navigate:"
     schedule_button: "📅 My Schedule"
+    courts_button: "🎾 Preferred Courts"
     help_button: "❓ Help"
     admin_button: "⚙️ Admin Panel"
     config_button: "🛠 Language"
+    back: "🔙 Back"
   schedule:
     refresh: "Refresh"
     set_availability: "Set Availability (Tour {0})"
