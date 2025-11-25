@@ -384,11 +384,12 @@
                 const direction = scrollButtonSide === 'right' ? 1 : -1;
                 changeWeek(direction);
             } else {
-                // Navigate days
+                // Navigate days - move by 4 days
                 const direction = scrollButtonSide === 'right' ? 4 : -4;
                 currentDayIndex += direction;
                 if (currentDayIndex < 0) currentDayIndex = 0;
-                if (currentDayIndex >= weekDates.length) currentDayIndex = weekDates.length - 1;
+                const maxIndex = Math.max(0, weekDates.length - 4);
+                if (currentDayIndex > maxIndex) currentDayIndex = maxIndex;
                 renderCalendar();
             }
         }
@@ -406,11 +407,14 @@
 
             if (tourStart && tourEnd) {
                 const newMonday = getMonday(newWeekStart);
-                const newSunday = new Date(newMonday);
-                newSunday.setDate(newSunday.getDate() + 6);
+                newMonday.setHours(0, 0, 0, 0);
+                const tourStartDate = new Date(tourStart);
+                tourStartDate.setHours(0, 0, 0, 0);
+                const tourEndDate = new Date(tourEnd);
+                tourEndDate.setHours(0, 0, 0, 0);
 
-                // Allow navigation if week has any overlap with tour dates
-                if (newSunday < tourStart || newMonday > tourEnd) {
+                // Don't allow navigation if Monday is before tour start or after tour end
+                if (newMonday < tourStartDate || newMonday > tourEndDate) {
                     return;
                 }
             }
@@ -440,50 +444,71 @@
 
         function renderCalendar(){
             const monday = getMonday(currentWeekStart);
+
+            // Build ALL dates for the tour period
             weekDates = [];
+            if (tourStart && tourEnd) {
+                const tourStartDate = new Date(tourStart);
+                tourStartDate.setHours(0, 0, 0, 0);
+                const tourEndDate = new Date(tourEnd);
+                tourEndDate.setHours(0, 0, 0, 0);
 
-            for (let i = 0; i < 7; i++) {
-                const date = new Date(monday);
-                date.setDate(date.getDate() + i);
-                weekDates.push(date);
+                for (let d = new Date(tourStartDate); d <= tourEndDate; d.setDate(d.getDate() + 1)) {
+                    weekDates.push(new Date(d));
+                }
+            } else {
+                // Fallback to week view if no tour dates
+                for (let i = 0; i < 7; i++) {
+                    const date = new Date(monday);
+                    date.setDate(date.getDate() + i);
+                    weekDates.push(date);
+                }
             }
-
-            const weekDisplay = `${formatDate(weekDates[0])} - ${formatDate(weekDates[6])}`;
-            document.getElementById('week-display').textContent = weekDisplay;
 
             let displayDates = weekDates;
             let canScrollRight = false;
             let canScrollLeft = false;
 
-            if (isMobileView && !showAllDays) {
-                // Day view - check if we can scroll within current week
+            if (!showAllDays) {
+                // 1-4 days view
                 const endIndex = Math.min(currentDayIndex + 4, weekDates.length);
                 displayDates = weekDates.slice(currentDayIndex, endIndex);
 
                 canScrollLeft = currentDayIndex > 0;
-                canScrollRight = currentDayIndex + 4 < weekDates.length;
+                canScrollRight = endIndex < weekDates.length;
 
-                // Determine scroll button position and visibility
+                // Determine scroll button position
                 if (!canScrollRight && canScrollLeft) {
                     scrollButtonSide = 'left';
                 } else {
                     scrollButtonSide = 'right';
                 }
             } else {
-                // Week view - check if we can navigate to other weeks
-                const monday = getMonday(currentWeekStart);
+                // Week view - find which week we're on and show 7 days
+                const currentMonday = getMonday(currentWeekStart);
+                currentMonday.setHours(0, 0, 0, 0);
 
-                // Check if we can go to previous week
-                const prevWeekMonday = new Date(monday);
-                prevWeekMonday.setDate(prevWeekMonday.getDate() - 7);
-                const prevWeekSunday = new Date(prevWeekMonday);
-                prevWeekSunday.setDate(prevWeekSunday.getDate() + 6);
-                canScrollLeft = tourStart && tourEnd && !(prevWeekSunday < tourStart);
+                // Find the starting index in weekDates array
+                let startIdx = 0;
+                for (let i = 0; i < weekDates.length; i++) {
+                    const d = new Date(weekDates[i]);
+                    d.setHours(0, 0, 0, 0);
+                    if (d.getTime() === currentMonday.getTime()) {
+                        startIdx = i;
+                        break;
+                    }
+                    if (d > currentMonday) {
+                        startIdx = Math.max(0, i - 1);
+                        break;
+                    }
+                }
 
-                // Check if we can go to next week
-                const nextWeekMonday = new Date(monday);
-                nextWeekMonday.setDate(nextWeekMonday.getDate() + 7);
-                canScrollRight = tourStart && tourEnd && !(nextWeekMonday > tourEnd);
+                const endIdx = Math.min(startIdx + 7, weekDates.length);
+                displayDates = weekDates.slice(startIdx, endIdx);
+
+                // Check if we can navigate to previous/next week
+                canScrollLeft = startIdx > 0;
+                canScrollRight = endIdx < weekDates.length;
 
                 // Determine scroll button position
                 if (!canScrollRight && canScrollLeft) {
@@ -492,6 +517,9 @@
                     scrollButtonSide = 'right';
                 }
             }
+
+            const weekDisplay = `${formatDate(displayDates[0])} - ${formatDate(displayDates[displayDates.length - 1])}`;
+            document.getElementById('week-display').textContent = weekDisplay;
 
             // Update scroll button visibility and appearance
             const scrollBtn = document.getElementById('scroll-nav-btn');
