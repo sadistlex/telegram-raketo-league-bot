@@ -642,9 +642,11 @@
             displayDates.forEach((d, idx) => {
                 const actualIdx = showAllDays ? idx : currentDayIndex + idx;
                 const dayName = DAY_NAMES[d.getDay() === 0 ? 6 : d.getDay()-1];
+                // Store the date as ISO string to avoid index confusion
+                const dateKey = d.toISOString();
                 headerHtml += `<th>
                     ${dayName}<br/>${formatDate(d)}<br/>
-                    <button class="cycle-btn day-toggle-btn red" data-day-index="${actualIdx}">🔴</button>
+                    <button class="cycle-btn day-toggle-btn red" data-day-index="${actualIdx}" data-date-key="${dateKey}">🔴</button>
                 </th>`;
             });
             headerHtml += '</tr>';
@@ -779,7 +781,9 @@
             const dayButtons = document.querySelectorAll('.day-toggle-btn');
             dayButtons.forEach(btn => {
                 const dayIndex = parseInt(btn.dataset.dayIndex, 10);
-                const targetDate = weekDates[dayIndex];
+                // Get the actual date from the dataset instead of using index
+                const dateKey = btn.dataset.dateKey;
+                const targetDate = new Date(dateKey);
 
                 // Use stored state if available, otherwise initialize
                 if (!dayButtonStates[dayIndex]) {
