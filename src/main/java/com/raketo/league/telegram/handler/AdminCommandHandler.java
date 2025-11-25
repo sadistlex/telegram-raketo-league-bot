@@ -241,14 +241,8 @@ public class AdminCommandHandler {
                         message.append("  Tour ").append(tourNumber).append(" (").append(fmt.format(ti.startDate())).append("-").append(fmt.format(ti.endDate())).append(") - ");
                         if (ti.opponent() != null) {
                             message.append(ti.opponent().getName()).append(" [").append(ti.status()).append("]");
-                            if (ti.responsiblePlayer() != null) {
-                                String responsibleInfo;
-                                if (ti.responsiblePlayer().getId().equals(ap.getId())) {
-                                    responsibleInfo = localizationService.msg(player, "schedule.tour.responsible.you");
-                                } else {
-                                    responsibleInfo = localizationService.msg(player, "schedule.tour.responsible.opponent", ti.responsiblePlayer().getName());
-                                }
-                                message.append(" - ").append(responsibleInfo);
+                            if (ti.responsiblePlayer() != null && ti.responsiblePlayer().getId().equals(ap.getId())) {
+                                message.append(" **");
                             }
                         } else {
                             message.append(localizationService.msg(player, "admin.schedule.bye"));
