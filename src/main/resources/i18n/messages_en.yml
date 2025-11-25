@@ -151,6 +151,10 @@ admin:
       usage: "Usage: {0} <divisionTournamentId>"
       failed: "Failed to view schedule: {0}"
     no_players: "No players found in this division tournament."
+    no_tours: "  No tours scheduled yet."
+    bye: "BYE"
+    player:
+      line: "🎾 {0} (@{1})"
     div:
       header: "Schedule for Division Tournament ID: {0}\n\n"
   tours:

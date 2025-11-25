@@ -477,16 +477,22 @@
                 canScrollLeft = currentDayIndex > 0;
                 canScrollRight = endIndex < weekDates.length;
 
-                // Determine scroll button position
+                // Always show button if can scroll in either direction
                 if (!canScrollRight && canScrollLeft) {
                     scrollButtonSide = 'left';
-                } else {
+                } else if (canScrollRight) {
                     scrollButtonSide = 'right';
+                } else if (canScrollLeft) {
+                    scrollButtonSide = 'left';
                 }
             } else {
-                // Week view - find which week we're on and show 7 days
+                // Week view - show Monday to Sunday only, within tour dates
                 const currentMonday = getMonday(currentWeekStart);
                 currentMonday.setHours(0, 0, 0, 0);
+                const tourStartDate = new Date(tourStart);
+                tourStartDate.setHours(0, 0, 0, 0);
+                const tourEndDate = new Date(tourEnd);
+                tourEndDate.setHours(0, 0, 0, 0);
 
                 // Find the starting index in weekDates array
                 let startIdx = 0;
@@ -503,18 +509,41 @@
                     }
                 }
 
-                const endIdx = Math.min(startIdx + 7, weekDates.length);
-                displayDates = weekDates.slice(startIdx, endIdx);
+                // Calculate Sunday of current week
+                const currentSunday = new Date(currentMonday);
+                currentSunday.setDate(currentSunday.getDate() + 6);
+                currentSunday.setHours(0, 0, 0, 0);
+
+                // Only show days that are both: in the week AND within tour dates
+                displayDates = [];
+                for (let i = 0; i < 7; i++) {
+                    const dayDate = new Date(currentMonday);
+                    dayDate.setDate(dayDate.getDate() + i);
+                    dayDate.setHours(0, 0, 0, 0);
+
+                    if (dayDate >= tourStartDate && dayDate <= tourEndDate) {
+                        displayDates.push(dayDate);
+                    }
+                }
 
                 // Check if we can navigate to previous/next week
-                canScrollLeft = startIdx > 0;
-                canScrollRight = endIdx < weekDates.length;
+                const prevMonday = new Date(currentMonday);
+                prevMonday.setDate(prevMonday.getDate() - 7);
+                prevMonday.setHours(0, 0, 0, 0);
+                canScrollLeft = prevMonday >= tourStartDate;
 
-                // Determine scroll button position
+                const nextMonday = new Date(currentMonday);
+                nextMonday.setDate(nextMonday.getDate() + 7);
+                nextMonday.setHours(0, 0, 0, 0);
+                canScrollRight = nextMonday <= tourEndDate;
+
+                // Always show button if can scroll in either direction
                 if (!canScrollRight && canScrollLeft) {
                     scrollButtonSide = 'left';
-                } else {
+                } else if (canScrollRight) {
                     scrollButtonSide = 'right';
+                } else if (canScrollLeft) {
+                    scrollButtonSide = 'left';
                 }
             }
 

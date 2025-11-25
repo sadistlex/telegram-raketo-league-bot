@@ -227,12 +227,12 @@ public class AdminCommandHandler {
                 return;
             }
             StringBuilder message = new StringBuilder();
-            message.append(localizationService.msg(player, "admin.schedule.div.header", divisionTournamentId));
+            message.append(localizationService.msg(player, "admin.schedule.div.header", divisionTournamentId)).append("\n");
             DateTimeFormatter fmt = DateTimeFormatter.ofPattern("dd.MM");
             for (PlayerDivisionAssignment assignment : assignments) {
                 Player ap = assignment.getPlayer();
                 message.append(localizationService.msg(player, "admin.schedule.player.line", ap.getName(), ap.getTelegramUsername())).append("\n");
-                ScheduleService.PlayerSchedule ps = scheduleService.buildPlayerSchedule(ap);
+                ScheduleService.PlayerSchedule ps = scheduleService.buildPlayerScheduleForDivision(ap, divisionTournamentId);
                 if (ps.tours().isEmpty()) {
                     message.append(localizationService.msg(player, "admin.schedule.no_tours")).append("\n");
                 } else {

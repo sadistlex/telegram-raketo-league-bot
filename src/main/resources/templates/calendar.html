@@ -377,6 +377,10 @@
         let showAllDays = !isMobileView;
         let scrollButtonSide = 'right';
 
+        // Store cycle button states persistently (key: dayIndex or hour)
+        let dayButtonStates = {};
+        let hourButtonStates = {};
+
         // Set initial button text correctly
         if (!showAllDays) {
             document.getElementById('toggle-view').textContent = MSG_SHOW_WEEK;
@@ -570,16 +574,22 @@
                 canScrollLeft = currentDayIndex > 0;
                 canScrollRight = endIndex < weekDates.length;
 
-                // Determine scroll button position
+                // Always show button if can scroll in either direction
                 if (!canScrollRight && canScrollLeft) {
                     scrollButtonSide = 'left';
-                } else {
+                } else if (canScrollRight) {
                     scrollButtonSide = 'right';
+                } else if (canScrollLeft) {
+                    scrollButtonSide = 'left';
                 }
             } else {
-                // Week view - find which week we're on and show 7 days
+                // Week view - show Monday to Sunday only, within tour dates
                 const currentMonday = getMonday(currentWeekStart);
                 currentMonday.setHours(0, 0, 0, 0);
+                const tourStartDate = new Date(tourStart);
+                tourStartDate.setHours(0, 0, 0, 0);
+                const tourEndDate = new Date(tourEnd);
+                tourEndDate.setHours(0, 0, 0, 0);
 
                 // Find the starting index in weekDates array
                 let startIdx = 0;
@@ -596,18 +606,41 @@
                     }
                 }
 
-                const endIdx = Math.min(startIdx + 7, weekDates.length);
-                displayDates = weekDates.slice(startIdx, endIdx);
+                // Calculate Sunday of current week
+                const currentSunday = new Date(currentMonday);
+                currentSunday.setDate(currentSunday.getDate() + 6);
+                currentSunday.setHours(0, 0, 0, 0);
+
+                // Only show days that are both: in the week AND within tour dates
+                displayDates = [];
+                for (let i = 0; i < 7; i++) {
+                    const dayDate = new Date(currentMonday);
+                    dayDate.setDate(dayDate.getDate() + i);
+                    dayDate.setHours(0, 0, 0, 0);
+
+                    if (dayDate >= tourStartDate && dayDate <= tourEndDate) {
+                        displayDates.push(dayDate);
+                    }
+                }
 
                 // Check if we can navigate to previous/next week
-                canScrollLeft = startIdx > 0;
-                canScrollRight = endIdx < weekDates.length;
+                const prevMonday = new Date(currentMonday);
+                prevMonday.setDate(prevMonday.getDate() - 7);
+                prevMonday.setHours(0, 0, 0, 0);
+                canScrollLeft = prevMonday >= tourStartDate;
 
-                // Determine scroll button position
+                const nextMonday = new Date(currentMonday);
+                nextMonday.setDate(nextMonday.getDate() + 7);
+                nextMonday.setHours(0, 0, 0, 0);
+                canScrollRight = nextMonday <= tourEndDate;
+
+                // Always show button if can scroll in either direction
                 if (!canScrollRight && canScrollLeft) {
                     scrollButtonSide = 'left';
-                } else {
+                } else if (canScrollRight) {
                     scrollButtonSide = 'right';
+                } else if (canScrollLeft) {
+                    scrollButtonSide = 'left';
                 }
             }
 
@@ -768,25 +801,31 @@
         function setupDayAndHourToggleHandlers(displayDates, displayStartHour) {
             const dayButtons = document.querySelectorAll('.day-toggle-btn');
             dayButtons.forEach(btn => {
-                // Initialize state based on most common color in the day (if data exists)
                 const dayIndex = parseInt(btn.dataset.dayIndex, 10);
                 const targetDate = weekDates[dayIndex];
-                const dayColors = {};
-                for (let hour = 0; hour <= 23; hour++) {
-                    const key = getSlotKey(targetDate, hour);
-                    const color = slots[key] || 'yellow';
-                    dayColors[color] = (dayColors[color] || 0) + 1;
-                }
-                // Determine most common color or default to red
-                let currentState = 'red';
-                let maxCount = 0;
-                Object.entries(dayColors).forEach(([color, count]) => {
-                    if (count > maxCount) {
-                        maxCount = count;
-                        currentState = color;
-                    }
-                });
 
+                // Use stored state if available, otherwise initialize
+                if (!dayButtonStates[dayIndex]) {
+                    // Initialize state based on most common color in the day (if data exists)
+                    const dayColors = {};
+                    for (let hour = 0; hour <= 23; hour++) {
+                        const key = getSlotKey(targetDate, hour);
+                        const color = slots[key] || 'yellow';
+                        dayColors[color] = (dayColors[color] || 0) + 1;
+                    }
+                    // Determine most common color or default to red
+                    let currentState = 'red';
+                    let maxCount = 0;
+                    Object.entries(dayColors).forEach(([color, count]) => {
+                        if (count > maxCount) {
+                            maxCount = count;
+                            currentState = color;
+                        }
+                    });
+                    dayButtonStates[dayIndex] = currentState;
+                }
+
+                const currentState = dayButtonStates[dayIndex];
                 btn.dataset.state = currentState;
                 btn.className = `cycle-btn day-toggle-btn ${currentState}`;
                 btn.textContent = currentState === 'red' ? '🔴' : currentState === 'green' ? '🟢' : '🟡';
@@ -803,9 +842,10 @@
 
                     // Cycle to next state for next press
                     const nextState = state === 'red' ? 'yellow' : state === 'yellow' ? 'green' : 'red';
+                    dayButtonStates[dayIndex] = nextState;
                     btn.dataset.state = nextState;
 
-                    // Update button appearance immediately (don't wait for render)
+                    // Update button appearance immediately
                     btn.className = `cycle-btn day-toggle-btn ${nextState}`;
                     btn.textContent = nextState === 'red' ? '🔴' : nextState === 'green' ? '🟢' : '🟡';
 
@@ -816,24 +856,30 @@
 
             const rowButtons = document.querySelectorAll('.row-toggle-btn');
             rowButtons.forEach(btn => {
-                // Initialize state based on most common color in the hour row (for visible days)
                 const hour = parseInt(btn.dataset.hour, 10);
-                const rowColors = {};
-                displayDates.forEach(date => {
-                    const key = getSlotKey(date, hour);
-                    const color = slots[key] || 'yellow';
-                    rowColors[color] = (rowColors[color] || 0) + 1;
-                });
-                // Determine most common color or default to red
-                let currentState = 'red';
-                let maxCount = 0;
-                Object.entries(rowColors).forEach(([color, count]) => {
-                    if (count > maxCount) {
-                        maxCount = count;
-                        currentState = color;
-                    }
-                });
 
+                // Use stored state if available, otherwise initialize
+                if (!hourButtonStates[hour]) {
+                    // Initialize state based on most common color in the hour row (for visible days)
+                    const rowColors = {};
+                    displayDates.forEach(date => {
+                        const key = getSlotKey(date, hour);
+                        const color = slots[key] || 'yellow';
+                        rowColors[color] = (rowColors[color] || 0) + 1;
+                    });
+                    // Determine most common color or default to red
+                    let currentState = 'red';
+                    let maxCount = 0;
+                    Object.entries(rowColors).forEach(([color, count]) => {
+                        if (count > maxCount) {
+                            maxCount = count;
+                            currentState = color;
+                        }
+                    });
+                    hourButtonStates[hour] = currentState;
+                }
+
+                const currentState = hourButtonStates[hour];
                 btn.dataset.state = currentState;
                 btn.className = `cycle-btn hour-btn row-toggle-btn ${currentState}`;
                 btn.textContent = currentState === 'red' ? '🔴' : currentState === 'green' ? '🟢' : '🟡';
@@ -850,9 +896,10 @@
 
                     // Cycle to next state for next press
                     const nextState = state === 'red' ? 'yellow' : state === 'yellow' ? 'green' : 'red';
+                    hourButtonStates[hour] = nextState;
                     btn.dataset.state = nextState;
 
-                    // Update button appearance immediately (don't wait for render)
+                    // Update button appearance immediately
                     btn.className = `cycle-btn hour-btn row-toggle-btn ${nextState}`;
                     btn.textContent = nextState === 'red' ? '🔴' : nextState === 'green' ? '🟢' : '🟡';
 
