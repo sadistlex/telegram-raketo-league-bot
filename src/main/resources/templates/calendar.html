@@ -317,8 +317,9 @@
 
     <div class="calendar-container">
         <div class="week-selector">
-            <button id="scroll-nav-btn">→</button>
+            <button id="prev-btn" style="display:none;">←</button>
             <span id="week-display">Loading...</span>
+            <button id="next-btn" style="display:none;">→</button>
         </div>
 
         <div class="calendar-grid">
@@ -375,7 +376,6 @@
         let isMobileView = window.innerWidth <= 768;
         let currentDayIndex = 0;
         let showAllDays = !isMobileView;
-        let scrollButtonSide = 'right';
 
         // Store cycle button states persistently (key: dayIndex or hour)
         let dayButtonStates = {};
@@ -394,7 +394,8 @@
         const tourStart = tourStartDate ? new Date(tourStartDate) : null;
         const tourEnd = tourEndDate ? new Date(tourEndDate) : null;
 
-        document.getElementById('scroll-nav-btn').addEventListener('click', handleScrollNav);
+        document.getElementById('prev-btn').addEventListener('click', () => handleNav(-1));
+        document.getElementById('next-btn').addEventListener('click', () => handleNav(1));
         document.getElementById('toggle-view').addEventListener('click', toggleView);
         document.getElementById('toggle-early-hours').addEventListener('click', toggleEarlyHours);
 
@@ -426,15 +427,13 @@
             renderCalendar();
         }
 
-        function handleScrollNav() {
+        function handleNav(direction) {
             if (showAllDays) {
                 // Navigate weeks
-                const direction = scrollButtonSide === 'right' ? 1 : -1;
                 changeWeek(direction);
             } else {
                 // Navigate days - move by 4 days
-                const direction = scrollButtonSide === 'right' ? 4 : -4;
-                currentDayIndex += direction;
+                currentDayIndex += direction * 4;
                 if (currentDayIndex < 0) currentDayIndex = 0;
                 const maxIndex = Math.max(0, weekDates.length - 4);
                 if (currentDayIndex > maxIndex) currentDayIndex = maxIndex;
@@ -573,15 +572,6 @@
 
                 canScrollLeft = currentDayIndex > 0;
                 canScrollRight = endIndex < weekDates.length;
-
-                // Always show button if can scroll in either direction
-                if (!canScrollRight && canScrollLeft) {
-                    scrollButtonSide = 'left';
-                } else if (canScrollRight) {
-                    scrollButtonSide = 'right';
-                } else if (canScrollLeft) {
-                    scrollButtonSide = 'left';
-                }
             } else {
                 // Week view - show Monday to Sunday only, within tour dates
                 const currentMonday = getMonday(currentWeekStart);
@@ -633,29 +623,17 @@
                 nextMonday.setDate(nextMonday.getDate() + 7);
                 nextMonday.setHours(0, 0, 0, 0);
                 canScrollRight = nextMonday <= tourEndDate;
-
-                // Always show button if can scroll in either direction
-                if (!canScrollRight && canScrollLeft) {
-                    scrollButtonSide = 'left';
-                } else if (canScrollRight) {
-                    scrollButtonSide = 'right';
-                } else if (canScrollLeft) {
-                    scrollButtonSide = 'left';
-                }
             }
 
             const weekDisplay = `${formatDate(displayDates[0])} - ${formatDate(displayDates[displayDates.length - 1])}`;
             document.getElementById('week-display').textContent = weekDisplay;
 
-            // Update scroll button visibility and appearance
-            const scrollBtn = document.getElementById('scroll-nav-btn');
-            if (canScrollLeft || canScrollRight) {
-                scrollBtn.style.display = '';
-                scrollBtn.textContent = scrollButtonSide === 'right' ? '→' : '←';
-                scrollBtn.style.order = scrollButtonSide === 'right' ? '2' : '0';
-            } else {
-                scrollBtn.style.display = 'none';
-            }
+            // Update navigation button visibility
+            const prevBtn = document.getElementById('prev-btn');
+            const nextBtn = document.getElementById('next-btn');
+
+            prevBtn.style.display = canScrollLeft ? '' : 'none';
+            nextBtn.style.display = canScrollRight ? '' : 'none';
 
             const header = document.getElementById('calendar-header');
             const body = document.getElementById('calendar-body');
@@ -795,7 +773,6 @@
             }
 
             setupDayAndHourToggleHandlers(displayDates, displayStartHour);
-            updateWeekButtons();
         }
 
         function setupDayAndHourToggleHandlers(displayDates, displayStartHour) {

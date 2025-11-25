@@ -139,10 +139,10 @@ public class TourService {
         List<TourTemplate> list = new ArrayList<>();
         LocalDateTime current = startDate;
         for (int i = 0; i < count; i++) {
-            LocalDateTime end = current.plusDays(durationDays);
+            LocalDateTime end = current.plusDays(durationDays - 1);
             TourTemplate template = TourTemplate.builder().divisionTournament(divisionTournament).startDate(current).endDate(end).build();
             list.add(template);
-            current = end;
+            current = end.plusDays(1);
         }
         tourTemplateRepository.saveAll(list);
         return list;
@@ -151,11 +151,12 @@ public class TourService {
     private Map<String, Long> persistTours(List<TourTemplate> templates, List<List<PlayerPair>> schedule) {
         Map<String, Long> map = new HashMap<>();
         Map<Long, Integer> responsibilityCount = new HashMap<>();
+        Map<Long, Integer> totalGamesCount = new HashMap<>();
 
         for (int i = 0; i < schedule.size(); i++) {
             TourTemplate template = templates.get(i);
             for (PlayerPair pair : schedule.get(i)) {
-                Player responsible = selectResponsiblePlayer(pair.player1, pair.player2, responsibilityCount);
+                Player responsible = selectResponsiblePlayer(pair.player1, pair.player2, responsibilityCount, totalGamesCount);
 
                 Tour tour = Tour.builder()
                         .tourTemplate(template)
@@ -167,22 +168,43 @@ public class TourService {
                 tourPlayerRepository.save(TourPlayer.builder().tour(saved).player(pair.player1).build());
                 tourPlayerRepository.save(TourPlayer.builder().tour(saved).player(pair.player2).build());
                 map.put(buildKey(template.getId(), pair.player1.getId(), pair.player2.getId()), saved.getId());
+
+                totalGamesCount.put(pair.player1.getId(), totalGamesCount.getOrDefault(pair.player1.getId(), 0) + 1);
+                totalGamesCount.put(pair.player2.getId(), totalGamesCount.getOrDefault(pair.player2.getId(), 0) + 1);
             }
         }
         return map;
     }
 
-    private Player selectResponsiblePlayer(Player p1, Player p2, Map<Long, Integer> responsibilityCount) {
-        int p1Count = responsibilityCount.getOrDefault(p1.getId(), 0);
-        int p2Count = responsibilityCount.getOrDefault(p2.getId(), 0);
+    private Player selectResponsiblePlayer(Player p1, Player p2, Map<Long, Integer> responsibilityCount, Map<Long, Integer> totalGamesCount) {
+        int p1ResponsibleCount = responsibilityCount.getOrDefault(p1.getId(), 0);
+        int p2ResponsibleCount = responsibilityCount.getOrDefault(p2.getId(), 0);
+        int p1TotalGames = totalGamesCount.getOrDefault(p1.getId(), 0);
+        int p2TotalGames = totalGamesCount.getOrDefault(p2.getId(), 0);
+
+        double p1Ratio = p1TotalGames == 0 ? 0.0 : (double) p1ResponsibleCount / p1TotalGames;
+        double p2Ratio = p2TotalGames == 0 ? 0.0 : (double) p2ResponsibleCount / p2TotalGames;
 
         Player responsible;
-        if (p1Count < p2Count) {
+
+        if (p1ResponsibleCount < p2ResponsibleCount) {
             responsible = p1;
-        } else if (p2Count < p1Count) {
+        } else if (p2ResponsibleCount < p1ResponsibleCount) {
             responsible = p2;
         } else {
-            responsible = new Random().nextBoolean() ? p1 : p2;
+            if (p1Ratio < p2Ratio) {
+                responsible = p1;
+            } else if (p2Ratio < p1Ratio) {
+                responsible = p2;
+            } else {
+                if (p1TotalGames < p2TotalGames) {
+                    responsible = p1;
+                } else if (p2TotalGames < p1TotalGames) {
+                    responsible = p2;
+                } else {
+                    responsible = p1.getId() < p2.getId() ? p1 : p2;
+                }
+            }
         }
 
         responsibilityCount.put(responsible.getId(), responsibilityCount.getOrDefault(responsible.getId(), 0) + 1);

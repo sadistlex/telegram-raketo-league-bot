@@ -244,9 +244,9 @@ public class AdminCommandHandler {
                             if (ti.responsiblePlayer() != null) {
                                 String responsibleInfo;
                                 if (ti.responsiblePlayer().getId().equals(ap.getId())) {
-                                    responsibleInfo = localizationService.msg(player, "schedule.responsible.you");
+                                    responsibleInfo = localizationService.msg(player, "schedule.tour.responsible.you");
                                 } else {
-                                    responsibleInfo = localizationService.msg(player, "schedule.responsible.opponent");
+                                    responsibleInfo = localizationService.msg(player, "schedule.tour.responsible.opponent", ti.responsiblePlayer().getName());
                                 }
                                 message.append(" - ").append(responsibleInfo);
                             }
