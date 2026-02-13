@@ -1,4 +1,4 @@
-version: '3.8'
+version: '2.4'
 
 services:
   mysql:
@@ -20,11 +20,7 @@ services:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       timeout: 20s
       retries: 10
-    # Memory optimization for MySQL - limit to ~200MB
-    deploy:
-      resources:
-        limits:
-          memory: 256M
+    mem_limit: 256m
     command: >
       --innodb-buffer-pool-size=64M
       --innodb-log-buffer-size=8M
@@ -53,6 +49,7 @@ services:
       WEBAPP_URL: ${WEBAPP_URL:-http://localhost:8080/webapp}
       SERVER_PORT: 8080
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      JAVA_TOOL_OPTIONS: "-Xms128m -Xmx256m -XX:+UseG1GC -XX:+UseStringDeduplication -XX:+UseContainerSupport"
     ports:
       - "${SERVER_PORT:-8080}:8080"
     depends_on:
@@ -60,11 +57,7 @@ services:
         condition: service_healthy
     networks:
       - raketo-network
-    # Memory limit for the bot container
-    deploy:
-      resources:
-        limits:
-          memory: 384M
+    mem_limit: 384m
 
 volumes:
   mysql-data:
