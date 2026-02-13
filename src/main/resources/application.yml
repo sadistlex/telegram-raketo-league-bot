@@ -2,11 +2,18 @@ spring:
   application:
     name: telegram-raketo-league-bot
 
+  # HikariCP connection pool tuning for low memory
   datasource:
     url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:raketo_league}?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&useUnicode=true&serverTimezone=UTC
     username: ${DB_USER:root}
     password: ${DB_PASSWORD:password}
     driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      minimum-idle: 2
+      maximum-pool-size: 5
+      idle-timeout: 30000
+      max-lifetime: 600000
+      connection-timeout: 20000
 
   jpa:
     hibernate:
@@ -15,6 +22,16 @@ spring:
     properties:
       hibernate:
         format_sql: true
+        # Memory optimizations
+        jdbc:
+          batch_size: 20
+          fetch_size: 20
+        order_inserts: true
+        order_updates: true
+        # Disable second-level cache if not needed
+        cache:
+          use_second_level_cache: false
+          use_query_cache: false
 
   messages:
     basename: i18n/messages
