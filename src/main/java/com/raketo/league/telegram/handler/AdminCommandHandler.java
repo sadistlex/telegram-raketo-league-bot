@@ -41,6 +41,8 @@ public class AdminCommandHandler {
             handleCreateTournamentCommand(chatId, text, bot, player);
         } else if (BotCommand.ADD_PLAYER.matches(text)) {
             handleAddPlayerCommand(chatId, text, bot, player);
+        } else if (BotCommand.VIEW_TOUR_SCHEDULE.matches(text)) {
+            handleViewTourScheduleCommand(chatId, text, bot, player);
         } else if (BotCommand.VIEW_SCHEDULE.matches(text)) {
             handleViewScheduleCommand(chatId, text, bot, player);
         } else if (BotCommand.LIST_TOURNAMENTS.matches(text)) {
@@ -55,8 +57,6 @@ public class AdminCommandHandler {
             handleGenerateTours(chatId, text, bot, player);
         } else if (BotCommand.REGENERATE_TOURS.matches(text)) {
             handleRegenerateTours(chatId, text, bot, player);
-        } else if (BotCommand.VIEW_TOUR_SCHEDULE.matches(text)) {
-            handleViewTourScheduleCommand(chatId, text, bot, player);
         } else {
             bot.sendMessage(chatId, localizationService.msg(player, "admin.unknown.command"));
         }
@@ -222,7 +222,7 @@ public class AdminCommandHandler {
 
     private void handleViewScheduleCommand(Long chatId, String text, TelegramBot bot, Player player) {
         try {
-            String[] parts = text.split(" ");
+            String[] parts = text.trim().split("\\s+");
             if (parts.length < 2) {
                 bot.sendMessage(chatId, localizationService.msg(player, "admin.schedule.view.usage", BotCommand.VIEW_SCHEDULE.getCommand()));
                 return;
@@ -269,7 +269,7 @@ public class AdminCommandHandler {
 
     private void handleViewTourScheduleCommand(Long chatId, String text, TelegramBot bot, Player player) {
         try {
-            String[] parts = text.split(" ");
+            String[] parts = text.trim().split("\\s+");
             if (parts.length < 2) {
                 bot.sendMessage(chatId, localizationService.msg(player, "admin.tour_schedule.view.usage", BotCommand.VIEW_TOUR_SCHEDULE.getCommand()));
                 return;
@@ -318,7 +318,7 @@ public class AdminCommandHandler {
 
     private void handleGenerateTours(Long chatId, String text, TelegramBot bot, Player player) {
         try {
-            String[] parts = text.split(" ");
+            String[] parts = text.trim().split("\\s+");
             if (parts.length < 4) {
                 bot.sendMessage(chatId, localizationService.msg(player, "admin.tours.generate.usage", BotCommand.GENERATE_TOURS.getCommand()));
                 return;
@@ -336,7 +336,7 @@ public class AdminCommandHandler {
 
     private void handleRegenerateTours(Long chatId, String text, TelegramBot bot, Player player) {
         try {
-            String[] parts = text.split(" ");
+            String[] parts = text.trim().split("\\s+");
             if (parts.length < 2) {
                 bot.sendMessage(chatId, localizationService.msg(player, "admin.tours.regenerate.usage", BotCommand.REGENERATE_TOURS.getCommand()));
                 return;
@@ -446,7 +446,7 @@ public class AdminCommandHandler {
 
     private void handleAssignPlayer(Long chatId, String text, TelegramBot bot, Player player) {
         try {
-            String[] parts = text.split(" ");
+            String[] parts = text.trim().split("\\s+");
             if (parts.length < 3) {
                 bot.sendMessage(chatId, localizationService.msg(player, "admin.assign.usage", BotCommand.ASSIGN_PLAYER.getCommand()));
                 return;

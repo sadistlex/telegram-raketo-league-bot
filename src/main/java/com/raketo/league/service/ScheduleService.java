@@ -26,7 +26,11 @@ public class ScheduleService {
     public PlayerSchedule buildPlayerSchedule(Player player) {
         List<PlayerDivisionAssignment> assignments = playerDivisionAssignmentRepository.findByPlayerId(player.getId());
         if (assignments.isEmpty()) { return new PlayerSchedule(player, List.of()); }
-        Set<Long> divisionTournamentIds = assignments.stream().map(a -> a.getDivisionTournament().getId()).collect(Collectors.toSet());
+        Set<Long> divisionTournamentIds = assignments.stream()
+                .filter(a -> a.getDivisionTournament().getTournament().getIsActive())
+                .map(a -> a.getDivisionTournament().getId())
+                .collect(Collectors.toSet());
+        if (divisionTournamentIds.isEmpty()) { return new PlayerSchedule(player, List.of()); }
         return buildPlayerScheduleForDivisions(player, divisionTournamentIds);
     }
 
@@ -37,7 +41,9 @@ public class ScheduleService {
 
     @Transactional(readOnly = true)
     public List<PlayerDivisionAssignment> getPlayerDivisions(Player player) {
-        return playerDivisionAssignmentRepository.findByPlayerId(player.getId());
+        return playerDivisionAssignmentRepository.findByPlayerId(player.getId()).stream()
+                .filter(a -> a.getDivisionTournament().getTournament().getIsActive())
+                .collect(Collectors.toList());
     }
 
     private PlayerSchedule buildPlayerScheduleForDivisions(Player player, Set<Long> divisionTournamentIds) {
