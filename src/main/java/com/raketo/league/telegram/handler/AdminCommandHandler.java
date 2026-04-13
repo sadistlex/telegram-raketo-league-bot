@@ -55,6 +55,8 @@ public class AdminCommandHandler {
             handleGenerateTours(chatId, text, bot, player);
         } else if (BotCommand.REGENERATE_TOURS.matches(text)) {
             handleRegenerateTours(chatId, text, bot, player);
+        } else if (BotCommand.VIEW_TOUR_SCHEDULE.matches(text)) {
+            handleViewTourScheduleCommand(chatId, text, bot, player);
         } else {
             bot.sendMessage(chatId, localizationService.msg(player, "admin.unknown.command"));
         }
@@ -105,7 +107,8 @@ public class AdminCommandHandler {
         InlineKeyboardButton regenerateToursBtn = InlineKeyboardButton.builder().text(localizationService.msg(player, "admin.menu.regenerate_tours")).callbackData("ADMIN_CMD_REGENERATE_TOURS").build();
         keyboard.add(List.of(generateToursBtn, regenerateToursBtn));
         InlineKeyboardButton viewScheduleBtn = InlineKeyboardButton.builder().text(localizationService.msg(player, "admin.menu.view_schedule")).callbackData("ADMIN_CMD_VIEW_SCHEDULE").build();
-        keyboard.add(List.of(viewScheduleBtn));
+        InlineKeyboardButton viewTourScheduleBtn = InlineKeyboardButton.builder().text(localizationService.msg(player, "admin.menu.view_tour_schedule")).callbackData("ADMIN_CMD_VIEW_TOUR_SCHEDULE").build();
+        keyboard.add(List.of(viewScheduleBtn, viewTourScheduleBtn));
         InlineKeyboardButton helpBtn = InlineKeyboardButton.builder().text(localizationService.msg(player, "admin.menu.help")).callbackData("ADMIN_HELP").build();
         keyboard.add(List.of(helpBtn));
         if (isAlsoPlayer) {
@@ -144,6 +147,9 @@ public class AdminCommandHandler {
             case "ADMIN_CMD_VIEW_SCHEDULE":
                 bot.sendMessage(chatId, localizationService.msg(player, "admin.cmd.view_schedule.usage", BotCommand.VIEW_SCHEDULE.getCommand()));
                 break;
+            case "ADMIN_CMD_VIEW_TOUR_SCHEDULE":
+                bot.sendMessage(chatId, localizationService.msg(player, "admin.cmd.view_tour_schedule.usage", BotCommand.VIEW_TOUR_SCHEDULE.getCommand()));
+                break;
             default:
                 bot.sendMessage(chatId, localizationService.msg(player, "admin.unknown.command"));
         }
@@ -164,6 +170,7 @@ public class AdminCommandHandler {
         helpMessage.append(localizationService.msg(player, "admin.help.view_schedule", BotCommand.VIEW_SCHEDULE.getCommand())).append("\n");
         helpMessage.append(localizationService.msg(player, "admin.help.generate_tours", BotCommand.GENERATE_TOURS.getCommand())).append("\n");
         helpMessage.append(localizationService.msg(player, "admin.help.regenerate_tours", BotCommand.REGENERATE_TOURS.getCommand())).append("\n");
+        helpMessage.append(localizationService.msg(player, "admin.help.view_tour_schedule", BotCommand.VIEW_TOUR_SCHEDULE.getCommand())).append("\n");
         if (isAlsoPlayer) {
             helpMessage.append(localizationService.msg(player, "admin.help.player.header"));
             helpMessage.append(localizationService.msg(player, "admin.help.player.schedule", BotCommand.SCHEDULE.getCommand())).append("\n");
@@ -257,6 +264,55 @@ public class AdminCommandHandler {
         } catch (Exception e) {
             logger.error("Error viewing schedule", e);
             bot.sendMessage(chatId, localizationService.msg(player, "admin.schedule.view.failed", e.getMessage()));
+        }
+    }
+
+    private void handleViewTourScheduleCommand(Long chatId, String text, TelegramBot bot, Player player) {
+        try {
+            String[] parts = text.split(" ");
+            if (parts.length < 2) {
+                bot.sendMessage(chatId, localizationService.msg(player, "admin.tour_schedule.view.usage", BotCommand.VIEW_TOUR_SCHEDULE.getCommand()));
+                return;
+            }
+            Long divisionTournamentId = Long.parseLong(parts[1]);
+            DivisionTournament dt = divisionService.findDivisionTournamentById(divisionTournamentId).orElse(null);
+            if (dt == null) {
+                bot.sendMessage(chatId, localizationService.msg(player, "admin.assign.divTournament.notfound", divisionTournamentId));
+                return;
+            }
+            List<ScheduleService.TourRoundInfo> rounds = scheduleService.buildTourGroupedSchedule(divisionTournamentId);
+            if (rounds.isEmpty()) {
+                bot.sendMessage(chatId, localizationService.msg(player, "admin.schedule.no_tours"));
+                return;
+            }
+            StringBuilder message = new StringBuilder();
+            message.append(localizationService.msg(player, "admin.schedule.div.header", divisionTournamentId)).append("\n");
+            String divisionName = dt.getDivision().getName();
+            DateTimeFormatter fmt = DateTimeFormatter.ofPattern("dd.MM");
+            for (ScheduleService.TourRoundInfo round : rounds) {
+                message.append(localizationService.msg(player, "admin.tour_schedule.tour.header",
+                        divisionName, round.tourNumber(),
+                        fmt.format(round.startDate()), fmt.format(round.endDate()))).append("\n");
+                for (ScheduleService.MatchPair match : round.matches()) {
+                    if (match.player2() == null) {
+                        // BYE
+                        message.append(localizationService.msg(player, "admin.tour_schedule.match.bye",
+                                match.player1().getName(),
+                                match.player1().getTelegramUsername())).append("\n");
+                    } else {
+                        message.append(localizationService.msg(player, "admin.tour_schedule.match.line",
+                                match.player1().getName(),
+                                match.player1().getTelegramUsername(),
+                                match.player2().getName(),
+                                match.player2().getTelegramUsername())).append("\n");
+                    }
+                }
+                message.append("\n");
+            }
+            bot.sendMessage(chatId, message.toString());
+        } catch (Exception e) {
+            logger.error("Error viewing tour schedule", e);
+            bot.sendMessage(chatId, localizationService.msg(player, "admin.tour_schedule.view.failed", e.getMessage()));
         }
     }
 

@@ -99,6 +99,7 @@ admin:
     generate_tours: "🗓️ Generate Tours"
     regenerate_tours: "🔄 Regenerate Tours"
     view_schedule: "📅 View Schedule"
+    view_tour_schedule: "📅 By Tour"
     help: "📖 Command Help"
     player_schedule: "👤 My Schedule"
   help:
@@ -116,6 +117,7 @@ admin:
     view_schedule: "{0} <divisionTournamentId>"
     generate_tours: "{0} <divTournamentId> <yyyy-MM-dd> <days>"
     regenerate_tours: "{0} <divTournamentId> - Regenerate tours (preserves availability)\n"
+    view_tour_schedule: "{0} <divisionTournamentId> - View schedule by tour"
     player:
       header: "\nPlayer Commands:\n"
       schedule: "{0} - View your schedule"
@@ -134,6 +136,8 @@ admin:
     regenerate_tours:
       usage: "Use command: {0} <divisionTournamentId>"
     view_schedule:
+      usage: "Use command: {0} <divisionTournamentId>"
+    view_tour_schedule:
       usage: "Use command: {0} <divisionTournamentId>"
   tournament:
     created: "Tournament created successfully!\nID: {0}\nName: {1}"
@@ -186,6 +190,15 @@ admin:
       notfound: "Division Tournament not found with ID: {0}"
     success: "Player assigned successfully!\nPlayer: {0}\nDivision Tournament ID: {1}"
     failed: "Failed to assign player: {0}"
+  tour_schedule:
+    view:
+      usage: "Usage: {0} <divisionTournamentId>"
+      failed: "Failed to view tour schedule: {0}"
+    tour:
+      header: "{0}, Tour {1} ({2}-{3}):"
+    match:
+      line: "{0} (@{1})  -  {2} (@{3})"
+      bye: "{0} (@{1})  -  BYE"
 
 match:
   request:

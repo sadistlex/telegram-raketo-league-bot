@@ -18,6 +18,7 @@ public class ScheduleService {
     private final TourPlayerRepository tourPlayerRepository;
     private final PlayerDivisionAssignmentRepository playerDivisionAssignmentRepository;
     private final TourTemplateRepository tourTemplateRepository;
+    private final TourRepository tourRepository;
     public static final ZoneId ZONE_ID = ZoneId.of("Asia/Tbilisi");
     public static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd.MM").withZone(ZONE_ID);
 
@@ -70,4 +71,49 @@ public class ScheduleService {
 
     public record PlayerSchedule(Player player, List<TourInfo> tours) {}
     public record TourInfo(Long tourId, LocalDateTime startDate, LocalDateTime endDate, Tour.TourStatus status, Player opponent, LocalDateTime scheduledTime, Player responsiblePlayer, Long divisionTournamentId) {}
+
+    @Transactional(readOnly = true)
+    public List<TourRoundInfo> buildTourGroupedSchedule(Long divisionTournamentId) {
+        List<TourTemplate> templates = tourTemplateRepository.findByDivisionTournamentId(divisionTournamentId);
+        templates.sort(Comparator.comparing(TourTemplate::getStartDate));
+
+        List<TourRoundInfo> result = new ArrayList<>();
+        int tourNumber = 1;
+
+        for (TourTemplate template : templates) {
+            List<Tour> tours = tourRepository.findByTourTemplateId(template.getId());
+            List<MatchPair> matches = new ArrayList<>();
+
+            for (Tour tour : tours) {
+                List<TourPlayer> tourPlayers = tourPlayerRepository.findByTourId(tour.getId());
+                List<Player> players = tourPlayers.stream().map(TourPlayer::getPlayer).collect(Collectors.toList());
+                if (players.size() == 2) {
+                    Player responsiblePlayer = tour.getResponsiblePlayer();
+                    Player player1, player2;
+                    if (responsiblePlayer != null && Objects.equals(players.get(0).getId(), responsiblePlayer.getId())) {
+                        player1 = players.get(0);
+                        player2 = players.get(1);
+                    } else if (responsiblePlayer != null && Objects.equals(players.get(1).getId(), responsiblePlayer.getId())) {
+                        player1 = players.get(1);
+                        player2 = players.get(0);
+                    } else {
+                        player1 = players.get(0);
+                        player2 = players.get(1);
+                    }
+                    matches.add(new MatchPair(player1, player2, tour.getStatus(), responsiblePlayer));
+                } else if (players.size() == 1) {
+                    // BYE
+                    matches.add(new MatchPair(players.get(0), null, tour.getStatus(), tour.getResponsiblePlayer()));
+                }
+            }
+
+            result.add(new TourRoundInfo(tourNumber, template.getStartDate(), template.getEndDate(), matches));
+            tourNumber++;
+        }
+
+        return result;
+    }
+
+    public record TourRoundInfo(int tourNumber, LocalDateTime startDate, LocalDateTime endDate, List<MatchPair> matches) {}
+    public record MatchPair(Player player1, Player player2, Tour.TourStatus status, Player responsiblePlayer) {}
 }

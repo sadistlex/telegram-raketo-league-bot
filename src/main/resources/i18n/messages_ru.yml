@@ -99,6 +99,7 @@ admin:
     generate_tours: "🗓️ Сгенерировать туры"
     regenerate_tours: "🔄 Регенерировать туры"
     view_schedule: "📅 Просмотр расписания"
+    view_tour_schedule: "📅 По турам"
     help: "📖 Справка по командам"
     player_schedule: "👤 Мой график"
   help:
@@ -116,6 +117,7 @@ admin:
     view_schedule: "{0} <divisionTournamentId>"
     generate_tours: "{0} <divTournamentId> <yyyy-MM-dd> <days>"
     regenerate_tours: "{0} <divisionTournamentId> - Регенерация туров (сохраняет доступность)\n"
+    view_tour_schedule: "{0} <divisionTournamentId> - Расписание по турам"
     player:
       header: "\nКоманды игрока:\n"
       schedule: "{0} - Мой график"
@@ -134,6 +136,8 @@ admin:
     regenerate_tours:
       usage: "Формат: {0} <divisionTournamentId>"
     view_schedule:
+      usage: "Формат: {0} <divisionTournamentId>"
+    view_tour_schedule:
       usage: "Формат: {0} <divisionTournamentId>"
   tournament:
     created: "Турнир создан!\nID: {0}\nИмя: {1}"
@@ -186,6 +190,15 @@ admin:
       notfound: "Дивизион турнира не найден ID: {0}"
     success: "Игрок назначен!\nИгрок: {0}\nDivision Tournament ID: {1}"
     failed: "Не удалось назначить игрока: {0}"
+  tour_schedule:
+    view:
+      usage: "Использование: {0} <divisionTournamentId>"
+      failed: "Не удалось просмотреть расписание по турам: {0}"
+    tour:
+      header: "{0}, {1}-й тур ({2}-{3}):"
+    match:
+      line: "{0} (@{1})  -  {2} (@{3})"
+      bye: "{0} (@{1})  -  Пропуск"
 
 match:
   request:

@@ -12,6 +12,8 @@ import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
+import java.util.List;
+
 @Component
 public class TelegramBot extends TelegramLongPollingBot {
 
@@ -82,7 +84,21 @@ public class TelegramBot extends TelegramLongPollingBot {
         return callbackData.equals("ADMIN_MENU");
     }
 
+    private static final int MAX_MESSAGE_LENGTH = 4096;
+
     public void sendMessage(Long chatId, String text) {
+        if (text.length() <= MAX_MESSAGE_LENGTH) {
+            doSendMessage(chatId, text);
+            return;
+        }
+
+        List<String> chunks = splitMessage(text, MAX_MESSAGE_LENGTH);
+        for (String chunk : chunks) {
+            doSendMessage(chatId, chunk);
+        }
+    }
+
+    private void doSendMessage(Long chatId, String text) {
         SendMessage message = SendMessage.builder()
                 .chatId(chatId.toString())
                 .text(text)
@@ -92,6 +108,22 @@ public class TelegramBot extends TelegramLongPollingBot {
         } catch (TelegramApiException e) {
             logger.error("Error sending message to chat {}", chatId, e);
         }
+    }
+
+    private List<String> splitMessage(String text, int maxLength) {
+        List<String> parts = new java.util.ArrayList<>();
+        while (text.length() > maxLength) {
+            int splitIndex = text.lastIndexOf('\n', maxLength);
+            if (splitIndex <= 0) {
+                splitIndex = maxLength;
+            }
+            parts.add(text.substring(0, splitIndex));
+            text = text.substring(splitIndex).stripLeading();
+        }
+        if (!text.isEmpty()) {
+            parts.add(text);
+        }
+        return parts;
     }
 
     @Override
